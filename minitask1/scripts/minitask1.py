@@ -7,6 +7,7 @@ from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 import tf
 import math
+import numpy as np
 
 class Pose:
     def __init__(self,x,y,theta):
@@ -51,25 +52,35 @@ class closedloop:
          return directions
 
     def run(self):
+        angles = [math.pi/2, math.pi, -math.pi/2, 0]
         vel_stop = Twist()
         vel_msg1 = Twist()
         vel_msg1.linear.x = 0.1
         vel_turn = Twist()
-        vel_turn.angular.z = 0.05
-        r = rospy.Rate(20) # 20hz
+        vel_turn.angular.z = 0.2
+        r = rospy.Rate(10) # 20hz
         S = [closedloop.LENGTH, 0]
         directions = self.generate_directions(self.generate_goals([self.cur_pos.x, self.cur_pos.y]))
         for i in range(0, closedloop.TURNS):
 
-            goal_pos = np.round([self.cur_pos.x, self.cur_pos.y] + directions[i])
-            while math.dist(goal_pos, [self.cur_pos.x, self.cur_pos.y]) > 0.04:
+            goal_pos = [self.cur_pos.x, self.cur_pos.y] + directions[i]
+            print(directions[i])
+            #print(self.angle(self.cur_pos.theta), (i+1) *math.pi / 2)
+            while math.dist(goal_pos, [self.cur_pos.x, self.cur_pos.y]) > 0.1:
+                print(goal_pos, [self.cur_pos.x, self.cur_pos.y])
+                print(math.dist(goal_pos, [self.cur_pos.x, self.cur_pos.y]))
+                print()
                 self.pos_pub.publish(vel_msg1)  
                 r.sleep()
             self.pos_pub.publish(vel_stop)
-
-            while self.angle(self.cur_pos.theta) < math.fmod(((i+1) * math.pi / 2) - 0.002, 2*math.pi):
+            lastdelta = self.angle(self.cur_pos.theta) - self.angle(angles[i])
+            while np.sign(self.angle(self.cur_pos.theta) - self.angle(angles[i])) == np.sign(lastdelta):
+                lastdelta = self.angle(self.cur_pos.theta) - self.angle(angles[i])
+            
+                print(self.cur_pos.theta, (i+1) *math.pi / 2)
                 self.pos_pub.publish(vel_turn)
                 r.sleep()
+
             self.pos_pub.publish(vel_stop)
             
 
