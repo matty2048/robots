@@ -6,7 +6,9 @@ from std_msgs.msg import String
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import LaserScan
- 
+import queue
+
+
 class Position:
     def __init__(self,x,y,theta):
         self.x : float = x 
@@ -17,7 +19,7 @@ class RandomWalk():
     WALK_LENGTH = 0.7
     # WALK_ANGLE = 2*math.pi / 3
     WALK_SPEED = 0.1
-    WALK_TURN_SPEED = 0.1
+    WALK_TURN_SPEED = 0.3
     DIR_FORWARD = 0
     DIR_LEFT = 90
     DIR_RIGHT = 270
@@ -54,13 +56,25 @@ class RandomWalk():
             return sum(points[:5:]) / len(points[:5:])
  
     def obstacle_detected(self):   
-        return self.lowest_average_reading(RandomWalk.DIR_FORWARD, 10) < 0.4 or \
-                self.lowest_average_reading((RandomWalk.DIR_FORWARD - 45 % 360), 10) < 0.35 or \
-                self.lowest_average_reading((RandomWalk.DIR_FORWARD - 25 % 360), 10) < 0.35 or \
-                self.lowest_average_reading((RandomWalk.DIR_FORWARD + 45 % 360), 10) < 0.35 or \
-                self.lowest_average_reading((RandomWalk.DIR_FORWARD + 25 % 360), 10) < 0.35
+        return self.lowest_average_reading(RandomWalk.DIR_FORWARD, 10) < 0.9 or \
+                self.lowest_average_reading((RandomWalk.DIR_FORWARD - 45 % 360), 10) < 0.45 or \
+                self.lowest_average_reading((RandomWalk.DIR_FORWARD - 25 % 360), 10) < 0.45 or \
+                self.lowest_average_reading((RandomWalk.DIR_FORWARD + 45 % 360), 10) < 0.45 or \
+                self.lowest_average_reading((RandomWalk.DIR_FORWARD + 25 % 360), 10) < 0.45
 
+    def right_dist(self):
+        return self.lowest_average_reading(RandomWalk.DIR_RIGHT,10)
  
+    def forward_dist(self):
+        return self.lowest_average_reading(RandomWalk.DIR_FORWARD,10)
+
+    def wall_dist(self):
+        #a = math.sqrt(pow(self.right_dist(),2) + pow(self.forward_dist(),2))
+        #area = (self.right_dist() * self.forward_dist())/2
+        #return (2 * area) / a
+        points = self.ranges[self.DIR_RIGHT+20:]
+        return min(points)
+
     def dist(self, pos_1, pos_2):
         return math.dist(pos_1, pos_2)
  
@@ -72,7 +86,7 @@ class RandomWalk():
         r = rospy.Rate(10) # 10hz
         r.sleep()
         start_pos = [self.pos.x, self.pos.y]
-        angle = random.uniform(-math.pi, math.pi)
+        angle = -math.pi + 1
         print(angle)
         while not rospy.is_shutdown():
             if abs(self.pos.theta - angle) > 0.1:
@@ -97,9 +111,38 @@ class RandomWalk():
             if self.obstacle_detected():
                 ##### Break --- Obstacle
                 ### temp testing code below
-                self.pos_pub.publish(vel_stop)
-                angle = random.uniform(-math.pi, math.pi)
-                print(angle)
+                #self.pos_pub.publish(vel_stop)
+                #angle = random.uniform(-math.pi, math.pi)
+                past_vals = queue.Queue(maxsize=5)
+                vel_msg = Twist()
+                vel_msg.linear.x = RandomWalk.WALK_SPEED / 2 
+                previous = 0
+                while not rospy.is_shutdown():
+                    actual_dist = self.right_dist()
+                    dist = self.wall_dist()
+                    error = dist - 0.5 
+                    print(dist, error)
+                    kp = 0.8
+                    kd = 0.3
+                    ki = 0.5
+                    P = -error
+                    I = ki * (P - previous)
+                    previous = P
+                    sums =0   
+                    for i in past_vals.queue:
+                        sums += i
+                    D = sums / len(past_vals.queue) if sums != 0 else 0
+                    if past_vals.full(): 
+                        past_vals.get()
+                    past_vals.put(P)
+                    vel_msg.angular.z = kp*P + kd*D + I
+                    print(vel_msg.angular.z) 
+                    print(P)                   
+                    print()
+                    self.pos_pub.publish(vel_msg)
+                    r.sleep()
+                
+                #print(angle)
                 # break
             r.sleep()
  
