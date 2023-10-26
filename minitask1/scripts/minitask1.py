@@ -27,6 +27,7 @@ class closedloop:
         self.pos_pub = rospy.Publisher('cmd_vel', Twist, queue_size=10)
         rospy.Subscriber('odom',Odometry,self.callback_odom)
         self.cur_pos = Pose(0,0,0)
+        self.pos_pub_odom = rospy.Publisher('odom', Odometry, queue_size=10)
     
     def angle(self, theta):
         return theta if theta > 0 else theta + 2*math.pi # might need to be >= not sure
@@ -34,17 +35,31 @@ class closedloop:
     def distance(self, pos_1, pos_2):
         return math.dist(pos_1, pos_2)
 
+    def calculate_goal(self, i, pos_1):
+        temp = pos_1
+        if i == 1:
+            temp[0] += 1
+        elif i == 2:
+            temp[1] += 1
+        elif i == 3:
+            temp[0] -= 1
+        else:
+            temp[1] -= 1
+        return temp
+
+
     def run(self):
         vel_stop = Twist()
         vel_msg1 = Twist()
-        vel_msg1.linear.x = 0.1
+        vel_msg1.linear.x = 0.05
         vel_turn = Twist()
         vel_turn.angular.z = 0.1
         r = rospy.Rate(10) # 10hz
         n = 4
+        self.pos_pub_odom.publish(Odometry())
         for i in range(1, n + 1):
-            start_pos = [self.cur_pos.x, self.cur_pos.y]
-            while self.distance(start_pos, [self.cur_pos.x, self.cur_pos.y]) < 1:
+            goal_pos = self.calculate_goal(i, [self.cur_pos.x, self.cur_pos.y])
+            while goal_pos - [self.cur_pos.x, self.cur_pos.y] > :
                 self.pos_pub.publish(vel_msg1)  
                 r.sleep()
             while self.angle(self.cur_pos.theta) < math.fmod((i * math.pi) / 2, 2*math.pi):
@@ -61,7 +76,7 @@ def open_loop():
 
     num_secs = 5
     vel_msg1 = Twist()
-    vel_msg1.linear.x = 0.2
+    vel_msg1.linear.x = 0.1
     vel_stop = Twist()
 
     vel_msg2 = Twist()
