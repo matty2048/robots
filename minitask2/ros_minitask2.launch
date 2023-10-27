@@ -1,0 +1,5 @@
+<launch>
+    <node pkg="minitask2" type="random_walk.py" name="publisher_random_walk_node" output="screen"></node>
+    <node pkg="minitask2" type="obstacle_avoidance.py" name="publisher_obstacle_avoidance_node" output="screen"></node>
+    <node pkg="minitask2" type="wall_walk.py" name="publisher_wall_walk_node" output="screen"></node>
+</launch>
