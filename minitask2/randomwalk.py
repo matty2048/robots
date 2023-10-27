@@ -118,12 +118,11 @@ class RandomWalk():
                 vel_msg.linear.x = RandomWalk.WALK_SPEED / 2 
                 previous = 0
                 while not rospy.is_shutdown():
-                    actual_dist = self.right_dist()
                     dist = self.wall_dist()
                     error = dist - 0.5 
                     print(dist, error)
                     kp = 0.8
-                    kd = 0.3
+                    kd = 0.9
                     ki = 0.5
                     P = -error
                     I = ki * (P - previous)
