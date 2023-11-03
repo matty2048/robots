@@ -28,18 +28,44 @@ class Follower:
         rospy.Subscriber('scan', LaserScan, self.callback_laser)
         rospy.Subscriber('odom', Odometry, self.callback_odom)
         self.pos = Position(0, 0, 0)
-        self.image_resized = None
+        self.image_resized = []
         self.pos_pub = rospy.Publisher('cmd_vel', Twist, queue_size=10)
         self.ranges = [0]*360
         self.range_min = 0.118
         self.range_max = 3.5
-        
+        self.mask = []
+        self.image = []
+        self.width = 0
+        cv2.startWindowThread()
+    
+    def green_dist(self):
+        if(np.size(self.image_resized) == 0): return
+        count = 0
+        xsum = 0
+        ysum = 0
+        h, w, _ = self.image_resized.shape
+        # calculate moments of binary image
+        M = cv2.moments(self.mask)
+
+        # calculate x,y coordinate of center
+        cX = int(M["m10"] / (M["m00"] + 1))
+        cY = int(M["m01"] / (M["m00"] + 1))
+
+        centre_mass = (cX, cY)
+        cv2.circle(self.image, centre_mass, 10, (0,0,255), 2)
+        return centre_mass
+    
     def image_callback(self, msg):
-        image = self.bridge.imgmsg_to_cv2(msg,desired_encoding='bgr8')
-        (h, w) = image.shape[:2]
-        self.image_resized = cv2.resize(image, (w//4,h//4))
+        self.image = self.bridge.imgmsg_to_cv2(msg,desired_encoding='bgr8')
+        hsv = cv2.cvtColor(self.image, cv2.COLOR_BGR2HSV)
+        h = hsv[:, :, 0]
+        self.mask = cv2.inRange(h, 50, 70)
+        self.image = cv2.bitwise_and(self.image, self.image, mask = self.mask)
+        (h, w) = self.image.shape[:2]
+        self.width = w
+        self.image_resized = cv2.resize(self.image, (int(w/4),int(h/4)))
         cv2.imshow("original", self.image_resized)
-        cv2.waitKey(0)
+        #cv2.waitKey(0)
 
     def callback_laser(self, msg):
         self.ranges = msg.ranges
@@ -51,13 +77,13 @@ class Follower:
         self.pos.x = msg.pose.pose.position.x
         self.pos.y = msg.pose.pose.position.y
 
-    def green_location(self):
-        th1 = cv2.inRange(self.image_resized, (36, 25, 25), (70, 255,255))
-        mass_x, mass_y = np.where(th1 >= 200)
-        # mass_x and mass_y are the list of x indices and y indices of mass pixels
-        cent_x = np.average(mass_x)
-        cent_y = np.average(mass_y)
-        return (cent_x, cent_y)
+    # def green_location(self):
+    #     th1 = cv2.inRange(self.image_resized, (36, 25, 25), (70, 255,255))
+    #     mass_x, mass_y = np.where(th1 >= 200)
+    #     # mass_x and mass_y are the list of x indices and y indices of mass pixels
+    #     cent_x = np.average(mass_x)
+    #     cent_y = np.average(mass_y)
+    #     return (cent_x, cent_y)
     
     def lowest_average_reading(self, centre, m):
         points = sorted(self.ranges[(centre - m) % 360:centre - 1:] + self.ranges[centre % 360: (centre + m) % 360:])
@@ -73,6 +99,7 @@ class Follower:
     def run(self):
         vel_msg1 = Twist()
         vel_turn = Twist()
+        past_vals = queue.Queue(maxsize=5)
         vel_turn.angular.z = self.WALK_TURN_SPEED
         vel_msg1.linear.x = self.WALK_SPEED
         r = rospy.Rate(self.SLEEP_RATE)
@@ -93,11 +120,28 @@ class Follower:
                     r.sleep()
             
             # Walk towards green
-            if not self.obstacle_condition(cond): # and can see green:
-                # walk towards green
-
-                # reach green, end
-                pass
+            previous = 0
+            while not self.obstacle_condition(cond) and (self.green_dist() == (0,0)):
+                dist = self.green_dist()
+                if not dist or dist == (0,0): continue
+                error = dist[0] - int(self.width/2)
+                print(dist, error)
+                kp = 0.0002
+                kd = 0.000
+                ki = 0.000
+                P = -error
+                I = ki * (P - previous)
+                previous = P
+                sums =0   
+                for i in past_vals.queue:
+                    sums += i
+                D = sums / len(past_vals.queue) if sums != 0 else 0
+                if past_vals.full(): 
+                    past_vals.get()
+                past_vals.put(P)
+                vel_turn.angular.z = kp*P + kd*D + I
+                self.pos_pub.publish(vel_turn)
+                r.sleep()
             
             # walk forward
             while not self.obstacle_condition(cond):
