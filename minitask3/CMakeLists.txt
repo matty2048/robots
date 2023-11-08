@@ -4,6 +4,6 @@ find_package(catkin REQUIRED COMPONENTS rospy std_msgs geometry_msgs)
 catkin_package(CATKIN_DEPENDS rospy std_msgs geometry_msgs)
 
 catkin_install_python(PROGRAMS
-  scripts/follower.py
-  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+   Scripts/script.py
+   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
