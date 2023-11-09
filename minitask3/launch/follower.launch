@@ -1,0 +1,3 @@
+<launch>
+  <node name="follower" pkg="minitask3" type="follower.py" output="screen" />
+</launch>

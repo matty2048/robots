@@ -7,6 +7,7 @@ from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 import tf
 import math
+import numpy as np
 
 class Pose:
     def __init__(self,x,y,theta):
@@ -15,6 +16,9 @@ class Pose:
         self.theta : float = theta
 
 class closedloop:
+    LENGTH = 1.05
+    TURNS = 4
+
     def callback_odom(self, msg):
         quarternion = [msg.pose.pose.orientation.x,msg.pose.pose.orientation.y,msg.pose.pose.orientation.z, msg.pose.pose.orientation.w]
         (roll, pitch, yaw) = tf.transformations.euler_from_quaternion(quarternion)
@@ -29,11 +33,25 @@ class closedloop:
         self.cur_pos = Pose(0,0,0)
         self.pos_pub_odom = rospy.Publisher('odom', Odometry, queue_size=10)
     
+
     def angle(self, theta):
         return theta if theta > 0 else theta + 2*math.pi # might need to be >= not sure
 
-    def distance(self, pos_1, pos_2):
-        return math.dist(pos_1, pos_2)
+    def generate_goals(self, pos_1):
+        S = [closedloop.LENGTH, 0]
+        goals = [[0,0]]
+        theta = 0
+        for i in range(0, 3):
+            A = [[math.cos(theta), -math.sin(theta)], [math.sin(theta), math.cos(theta)]]
+            pos_1 += np.matmul(A, S)
+            goals.append(np.round(pos_1, 4))
+            theta += math.pi / 2
+        return goals
+
+    def generate_directions(self, goals):
+         directions = [goals[(i + 1) % len(goals)] - goals[i] for i in range(len(goals))]
+         # return [v / np.linalg.norm(v) for v in directions]
+         return directions
 
     def calculate_goal(self, i, pos_1):
         temp = pos_1
@@ -49,10 +67,12 @@ class closedloop:
 
 
     def run(self):
+        angles = [math.pi/2, math.pi, -math.pi/2, 0]
         vel_stop = Twist()
         vel_msg1 = Twist()
         vel_msg1.linear.x = 0.05
         vel_turn = Twist()
+
         vel_turn.angular.z = 0.1
         r = rospy.Rate(10) # 10hz
         n = 4
@@ -60,12 +80,31 @@ class closedloop:
         for i in range(1, n + 1):
             goal_pos = self.calculate_goal(i, [self.cur_pos.x, self.cur_pos.y])
             while goal_pos - [self.cur_pos.x, self.cur_pos.y] > :
+        vel_turn.angular.z = 0.2
+        r = rospy.Rate(10) # 20hz
+        S = [closedloop.LENGTH, 0]
+        directions = self.generate_directions(self.generate_goals([self.cur_pos.x, self.cur_pos.y]))
+        for i in range(0, closedloop.TURNS):
+
+            goal_pos = [self.cur_pos.x, self.cur_pos.y] + directions[i]
+            print(directions[i])
+            #print(self.angle(self.cur_pos.theta), (i+1) *math.pi / 2)
+            while math.dist(goal_pos, [self.cur_pos.x, self.cur_pos.y]) > 0.1:
+                print(goal_pos, [self.cur_pos.x, self.cur_pos.y])
+                print(math.dist(goal_pos, [self.cur_pos.x, self.cur_pos.y]))
+                print()
                 self.pos_pub.publish(vel_msg1)  
                 r.sleep()
-            while self.angle(self.cur_pos.theta) < math.fmod((i * math.pi) / 2, 2*math.pi):
+            self.pos_pub.publish(vel_stop)
+            lastdelta = self.angle(self.cur_pos.theta) - self.angle(angles[i])
+            while np.sign(self.angle(self.cur_pos.theta) - self.angle(angles[i])) == np.sign(lastdelta):
+                lastdelta = self.angle(self.cur_pos.theta) - self.angle(angles[i])
+            
+                print(self.cur_pos.theta, (i+1) *math.pi / 2)
                 self.pos_pub.publish(vel_turn)
                 r.sleep()
-        self.pos_pub.publish(vel_stop)
+
+            self.pos_pub.publish(vel_stop)
             
 
 def open_loop():
