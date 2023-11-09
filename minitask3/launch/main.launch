@@ -1,0 +1,7 @@
+<launch>
+    <node name="main" pkg="minitask3" type="script.py" output="screen"/>
+    <!-- <node name="green_walk" pkg="minitask3" type="green_walk.py" output="screen"/>
+    <node name="green_obstacle" pkg="minitask3" type="green_obstacle.py" output="screen"/> -->
+    <node name="random_walk" pkg="minitask3" type="random_walk.py" output="screen"/>
+    <node name="random_turn" pkg="minitask3" type="random_turn.py" output="screen"/>
+</launch>
