@@ -81,6 +81,14 @@ class Follower:
         self.pos.x = msg.pose.pose.position.x
         self.pos.y = msg.pose.pose.position.y
 
+    # def green_location(self):
+    #     th1 = cv2.inRange(self.image_resized, (36, 25, 25), (70, 255,255))
+    #     mass_x, mass_y = np.where(th1 >= 200)
+    #     # mass_x and mass_y are the list of x indices and y indices of mass pixels
+    #     cent_x = np.average(mass_x)
+    #     cent_y = np.average(mass_y)
+    #     return (cent_x, cent_y)
+    
     def lowest_average_reading(self, centre, m):
         points = sorted(self.ranges[(centre - m) % 360:centre - 1:] + self.ranges[centre % 360: (centre + m) % 360:])
         points = [x if x < self.range_max else 3.5 for x in points]

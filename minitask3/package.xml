@@ -6,6 +6,8 @@
     <maintainer email="ian.knight2@nottingham.ac.uk">Ian Knight</maintainer>
     <license>MIT</license>
 
+    <build_depend>message_generation</build_depend>
+    <exec_depend>message_runtime</exec_depend>
     <buildtool_depend>catkin</buildtool_depend>
     <depend>rospy</depend>
     <depend>std_msgs</depend>
