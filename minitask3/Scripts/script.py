@@ -31,6 +31,8 @@ class Follower:
         rospy.Subscriber('odom', Odometry, self.callback_odom)
         rospy.Subscriber('current_state_mt3', state_mt3, self.callback_state)
         self.finished_action = 1
+        self.state_random_walk = 0
+        self.state_random_turn = 0
         self.pos = Position(0, 0, 0)
         self.image_resized = []
         self.pos_pub = rospy.Publisher('cmd_vel', Twist, queue_size=10)
@@ -57,6 +59,9 @@ class Follower:
     
     def callback_state(self, msg):
         self.finished_action = msg.finished_action
+        self.state_random_walk = msg.state_random_walk
+        self.state_random_turn = msg.state_random_turn
+
 
     def image_callback(self, msg):
         self.image = self.bridge.imgmsg_to_cv2(msg,desired_encoding='bgr8')
@@ -78,14 +83,6 @@ class Follower:
         self.pos.theta = yaw
         self.pos.x = msg.pose.pose.position.x
         self.pos.y = msg.pose.pose.position.y
-
-    # def green_location(self):
-    #     th1 = cv2.inRange(self.image_resized, (36, 25, 25), (70, 255,255))
-    #     mass_x, mass_y = np.where(th1 >= 200)
-    #     # mass_x and mass_y are the list of x indices and y indices of mass pixels
-    #     cent_x = np.average(mass_x)
-    #     cent_y = np.average(mass_y)
-    #     return (cent_x, cent_y)
     
     def lowest_average_reading(self, centre, m):
         points = sorted(self.ranges[(centre - m) % 360:centre - 1:] + self.ranges[centre % 360: (centre + m) % 360:])
@@ -102,73 +99,29 @@ class Follower:
         r = rospy.Rate(self.SLEEP_RATE)
         r.sleep()
         cond = [(0, 0.5), (315, 0.45), (335, 0.45), (25, 0.45), (45, 0.45), (90, 0.45)]
+        turned_last = 1
         while not rospy.is_shutdown():
 
-            # if self.obstacle_condition(cond):
-            #     while self.obstacle_condition(cond):
-            #         self.pos_pub.publish(vel_turn)
-            #         r.sleep()
-            
-            # # Walk towards green
-            # previous = 0
-            # while not self.obstacle_condition(cond) and (self.green_dist() == (0,0)):
-            #     dist = self.green_dist()
-            #     if not dist or dist == (0,0): continue
-            #     error = dist[0] - int(self.width/2)
-            #     print(dist, error)
-            #     kp = 0.0002
-            #     kd = 0.000
-            #     ki = 0.000
-            #     P = -error
-            #     I = ki * (P - previous)
-            #     previous = P
-            #     sums =0   
-            #     for i in past_vals.queue:
-            #         sums += i
-            #     D = sums / len(past_vals.queue) if sums != 0 else 0
-            #     if past_vals.full(): 
-            #         past_vals.get()
-            #     past_vals.put(P)
-            #     vel_turn.angular.z = kp*P + kd*D + I
-            #     self.pos_pub.publish(vel_turn)
-            #     r.sleep()
-            
-            # # walk forward
-            # while not self.obstacle_condition(cond):
-            #     self.pos_pub.publish(vel_msg1)
-            #     if self.obstacle_condition(cond):
-            #         self.pos_pub.publish(Twist())
-            #         break
-            #     r.sleep()
-
-            # # random turn for set time or if there is an obstacle
-            # t = rospy.Time.now().to_sec()
-            # r_t = random.randint(3, 10)
-            # while rospy.Time.now().to_sec() - t < rospy.Duration(r_t).to_sec() or self.obstacle_condition(cond):
-            #     self.pos_pub.publish(vel_turn)
-
-            #     r.sleep()
-            
-            # self.pos_pub.publish(Twist())
-
-            # green detected
             r.sleep()
-
             if not self.finished_action:
+                if (self.state_random_walk or self.state_random_turn) and not self.green_dist() == (0,0):
+                    self.state_pub.publish(state_mt3(finished_action = 1))
                 continue
 
             print("Deciding what to do")
-            if self.obstacle_condition(cond):
-                print("Decided to turn")
-                self.state_pub.publish(state_mt3(0, 0, 1, 0))
+
+            if not self.green_dist() == (0,0):
+                print("Decided to go towards green")
+                self.state_pub.publish(state_mt3(state_green_walk = 1))
             else:
-                print("Decided to walk")
-                self.state_pub.publish(state_mt3(0, 1, 0, 0))
-            # else:
-            # if not self.green_dist() == (0,0):
-            #     self.state_pub.publish(state_mt3(1, 0, 0, 0))
-            # else:
-            #     self.state_pub.publish(state_mt3(0, 0, 1, 0))
+                if self.obstacle_condition(cond) or not turned_last:
+                    print("Decided to avoid obstacle by turning randomly")
+                    self.state_pub.publish(state_mt3(state_random_turn = 1))
+                    turned_last = 1
+                else:
+                    print("Decided to walk")
+                    self.state_pub.publish(state_mt3(state_random_walk = 1))
+                    turned_last = 0
 
 if __name__ == '__main__':
     try:

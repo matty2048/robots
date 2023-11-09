@@ -18,7 +18,6 @@ class Position:
 
 class Random_Walk:
     SLEEP_RATE = 10
-    WALK_SECONDS = 10
     WALK_SPEED = 0.15
     
     def __init__(self) -> None:
@@ -32,7 +31,7 @@ class Random_Walk:
         self.range_max = 3.5
         self.state_random_walk = 0
         self.finished_action = 0
-    
+
     def callback_laser(self, msg):
         self.ranges = msg.ranges
 
@@ -59,16 +58,16 @@ class Random_Walk:
         while not rospy.is_shutdown():
             if self.state_random_walk and not self.finished_action:
                 print("Entering random walk")
-                # t = rospy.Time.now().to_sec()
-                # r_t = random.randint(3, 10)
-                while not self.obstacle_condition(cond):
+                t = rospy.Time.now().to_sec()
+                r_t = random.randint(3, 10)
+                while rospy.Time.now().to_sec() - t < rospy.Duration(r_t).to_sec() or self.obstacle_condition(cond):
                     self.pos_pub.publish(vel_for)
                     if self.obstacle_condition(cond):
                         self.pos_pub.publish(Twist())
                         break
                     r.sleep()
                 print("Exiting random walk")
-                self.state_pub.publish(state_mt3(0, 0, 0, 1))
+                self.state_pub.publish(state_mt3(finished_action = 1))
             r.sleep()
 
 if __name__ == '__main__':

@@ -31,8 +31,8 @@ include_directories(
 )
 
 catkin_install_python(PROGRAMS
-   # Scripts/green_obstacle.py
-   # Scripts/green_walk.py
+#   Scripts/green_obstacle.py
+   Scripts/green_walk.py
    Scripts/random_turn.py
    Scripts/random_walk.py
    Scripts/script.py

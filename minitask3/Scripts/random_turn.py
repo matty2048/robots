@@ -52,21 +52,20 @@ class Random_Turn:
     
     def run(self):
         vel_turn = Twist()
-        vel_turn.angular.z = self.WALK_TURN_SPEED
         r = rospy.Rate(10)
         cond = [(0, 0.5), (315, 0.45), (335, 0.45), (25, 0.45), (45, 0.45), (90, 0.45)]
         while not rospy.is_shutdown():
             if self.state_random_turn and not self.finished_action:
-
                 print("Entering random turn")
                 t = rospy.Time.now().to_sec()
                 r_t = random.randint(3, 10)
+                vel_turn.angular.z = self.WALK_TURN_SPEED if random.randrange(0, 2, 1) else -self.WALK_TURN_SPEED
                 while rospy.Time.now().to_sec() - t < rospy.Duration(r_t).to_sec() or self.obstacle_condition(cond):
                     self.pos_pub.publish(vel_turn)
                     r.sleep()
                 self.pos_pub.publish(Twist())
                 print("Exiting random turn")
-                self.state_pub.publish(state_mt3(0, 0, 0, 1))
+                self.state_pub.publish(state_mt3(finished_action = 1))
             r.sleep()
 
 if __name__ == '__main__':
