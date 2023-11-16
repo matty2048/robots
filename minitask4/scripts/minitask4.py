@@ -5,7 +5,7 @@ from math import radians, degrees
 from actionlib_msgs.msg import *
 from geometry_msgs.msg import Point
 from geometry_msgs.msg import Twist
-from nav_msgs.msg import Odometry
+from nav_msgs.msg import Odometry, OccupancyGrid, MapMetaData
 from sensor_msgs.msg import LaserScan, Image
 import tf
 import numpy as np
@@ -27,10 +27,30 @@ class map_navigation():
         self.ranges = [0]*360
         self.range_min = 0.118
         self.range_max = 3.5
+        self.res = 0.05
+        self.size_x = 384
+        self.size_y = 384
+        self.grid : list[int] = []
+        for i in range(384*384):
+            self.grid.append(-1)
+        self.origin_ = (-10, -10)
+        self.old_grid = OccupancyGrid()
+        self.occ_pub = rospy.Publisher('/map', OccupancyGrid, queue_size=10)
         rospy.Subscriber('scan', LaserScan, self.callback_laser)
         rospy.Subscriber('odom', Odometry, self.callback_odom)
+        # self.occ_sub = rospy.Subscriber('OccupancyGrid', OccupancyGrid, self.callback_occ)
         rospy.init_node('map_navigation', anonymous=False)
         choice = 0
+
+    def callback_occ(self, msg):
+        print("in callback")
+        self.res = msg.info.resolution
+        self.origin_ = (msg.info.origin.position.x, msg.info.origin.position.y)
+        self.size_x = msg.info.width
+        self.size_y = msg.info.height
+        self.grid = [-1]*(self.size_x*self.size_y)
+        self.old_grid = msg
+        self.occ_sub.unregister()
     
     def callback_laser(self, msg):
         self.ranges = msg.ranges
@@ -87,18 +107,18 @@ class map_navigation():
             return False
     
     def to_grid(self, px, py, origin_, size, resolution):
-        offsetx = (1/resolution)*(px - origin_[0])
-        offsety = (1/resolution)*(py - origin_[1])
+        offsetx = (1/resolution)*(px - origin_[1])
+        offsety = (1/resolution)*(py - origin_[0])
         return (int(offsetx), int(offsety))
         
         
     def to_world(self, gx, gy, origin, size, resolution):
-        offsetx = (resolution)*gx + origin[0]
-        offsety = (resolution)*gy + origin[1]
+        offsetx = (resolution)*gx + origin[1]
+        offsety = (resolution)*gy + origin[0]
         return (offsetx, offsety)
 
     def to_index(self, gx, gy, size_x):
-        return gy * size_x + gx
+        return gx * size_x + gy
 
     def get_line(self, start, end):
         """Bresenham's Line Algorithm
@@ -164,40 +184,41 @@ class map_navigation():
         #self.moveToGoal(-1.45,4.13)
         #self.moveToGoal(-5.5,3.5)
         #self.moveToGoal(4.2,4.2)
-        res = 0.1
-        size = (25, 25)
-        size_x = int(size[0] / res)
-        size_y = int(size[1] / res)
-
-        grid = [-1]*(size_x*size_y)
-        # origin of grid
-        origin_ = (-10, -10)
-        # origin of world
-        origin = (self.pos.x, self.pos.y)
         # resolution
         r = rospy.Rate(5)
-        print("size_x={size_x}, size_y={size_y}, grid size={grid_size}, origin_={pos}".format(size_x=size_x, size_y=size_y, grid_size=np.array(grid).size, pos=origin_))
-        print(self.to_grid(self.pos.x, self.pos.y, origin_, size, res))
+        print("here")
+        while not self.grid:
+            r.sleep()
+        size = (self.size_x*self.res, self.size_y*self.res)
         
-        # while not rospy.is_shutdown():
-        for k in range(50):
+        print("size_x={size_x}, size_y={size_y}, grid size={grid_size}, origin_={pos}".format(size_x=self.size_x, size_y=self.size_y, grid_size=np.array(self.grid).size, pos=self.origin_))
+        print(self.to_grid(self.pos.x, self.pos.y, self.origin_, size, self.res))
+        while not rospy.is_shutdown():
             points = self.filter_min_max(self.ranges)
-            cur_pos = self.to_grid(self.pos.x, self.pos.y, origin_, size, res)
+            cur_pos = self.to_grid(self.pos.x, self.pos.y, self.origin_, size, self.res)
             cur_angle = self.pos.theta
             for i in range(len(points)):
                 if points[i] == 0: continue
                 rads = radians(i) + cur_angle
                 # Suspect this is the cause behind the flipping ?
-                endpos = self.to_grid(self.pos.x + points[i] * math.sin(rads), self.pos.y + points[i] * math.cos(rads), origin_, size, res)
+                endpos = self.to_grid(self.pos.x + points[i] * math.sin(rads), self.pos.y + points[i] * math.cos(rads), self.origin_, size, self.res)
                 gridpoints = self.get_line(cur_pos, endpos)
 
                 for j in range(len(gridpoints)-1):
                     temp = (gridpoints[j][0], gridpoints[j][1])
-                    grid[self.to_index(temp[0], temp[1], size_x)] = 0.05
+                    self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 0
                 temp = (gridpoints[-1][0], gridpoints[-1][1])
-                grid[self.to_index(temp[0], temp[1], size_x)] = 1
+                self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 100
+            self.old_grid.data = self.grid
+            self.old_grid.info.height = self.size_y
+            self.old_grid.info.width = self.size_x
+            self.old_grid.info.resolution = self.res
+            self.old_grid.info.origin.position.x = self.origin_[0]
+            self.old_grid.info.origin.position.y = self.origin_[1]
+            
+            self.occ_pub.publish(self.old_grid)
             r.sleep()
-        plt.imshow(np.reshape(np.array(grid), (size_x, size_y)), interpolation='nearest')
+        plt.imshow(np.reshape(np.array(self.grid), (self.size_x, self.size_y)), interpolation='nearest')
         plt.show()
 
     
