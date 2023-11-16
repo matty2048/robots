@@ -8,8 +8,9 @@ from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import LaserScan, Image
 import tf
+import numpy as np
 import math
-
+from matplotlib import pyplot as plt
 
 class Position:
     def __init__(self,x,y,theta):
@@ -22,13 +23,13 @@ class map_navigation():
     def __init__(self):
         self.goalReached = False
         # initiliaze
-        rospy.Subscriber('scan', LaserScan, self.callback_laser)
-        rospy.Subscriber('odom', Odometry, self.callback_odom)
-        rospy.init_node('map_navigation', anonymous=False)
         self.pos = Position(0, 0, 0)
         self.ranges = [0]*360
         self.range_min = 0.118
         self.range_max = 3.5
+        rospy.Subscriber('scan', LaserScan, self.callback_laser)
+        rospy.Subscriber('odom', Odometry, self.callback_odom)
+        rospy.init_node('map_navigation', anonymous=False)
         choice = 0
     
     def callback_laser(self, msg):
@@ -86,9 +87,10 @@ class map_navigation():
             return False
     
     def to_grid(self, px, py, origin_, size, resolution):
-        offsetx = (1/resolution)*px - origin_[0]
-        offsety = (1/resolution)*py - origin_[1]
+        offsetx = (1/resolution)*(px - origin_[0])
+        offsety = (1/resolution)*(py - origin_[1])
         return (int(offsetx), int(offsety))
+        
         
     def to_world(self, gx, gy, origin, size, resolution):
         offsetx = (resolution)*gx + origin[0]
@@ -162,23 +164,41 @@ class map_navigation():
         #self.moveToGoal(-1.45,4.13)
         #self.moveToGoal(-5.5,3.5)
         #self.moveToGoal(4.2,4.2)
-        points = self.filter_min_max(self.ranges)
-        for i in range(len(points)):
-            if points[i] == 0: continue
-            
-            endposx = endposy = 0
-            rads = radians(i)
-            endposx = points[i] * math.sin(rads)
-            endposy = points[i] * math.cos(rads)
-            
-            #convert to grid space
-            gridpoints = self.get_line((self.pos.x, self.pos.y), (endposx,endposy))
-            
-            grid[gridpoints[-1][0]][gridpoints[-1][1]] = OCCUPIED
-            for j in range(len(gridpoints)-1):
-                 grid[gridpoints[j][0]][gridpoints[j][1]] = EMPTY
+        res = 0.1
+        size = (25, 25)
+        size_x = int(size[0] / res)
+        size_y = int(size[1] / res)
 
+        grid = [-1]*(size_x*size_y)
+        # origin of grid
+        origin_ = (-10, -10)
+        # origin of world
+        origin = (self.pos.x, self.pos.y)
+        # resolution
+        r = rospy.Rate(5)
+        print("size_x={size_x}, size_y={size_y}, grid size={grid_size}, origin_={pos}".format(size_x=size_x, size_y=size_y, grid_size=np.array(grid).size, pos=origin_))
+        print(self.to_grid(self.pos.x, self.pos.y, origin_, size, res))
+        
+        # while not rospy.is_shutdown():
+        for k in range(50):
+            points = self.filter_min_max(self.ranges)
+            cur_pos = self.to_grid(self.pos.x, self.pos.y, origin_, size, res)
+            cur_angle = self.pos.theta
+            for i in range(len(points)):
+                if points[i] == 0: continue
+                rads = radians(i) + cur_angle
+                # Suspect this is the cause behind the flipping ?
+                endpos = self.to_grid(self.pos.x + points[i] * math.sin(rads), self.pos.y + points[i] * math.cos(rads), origin_, size, res)
+                gridpoints = self.get_line(cur_pos, endpos)
 
+                for j in range(len(gridpoints)-1):
+                    temp = (gridpoints[j][0], gridpoints[j][1])
+                    grid[self.to_index(temp[0], temp[1], size_x)] = 0.05
+                temp = (gridpoints[-1][0], gridpoints[-1][1])
+                grid[self.to_index(temp[0], temp[1], size_x)] = 1
+            r.sleep()
+        plt.imshow(np.reshape(np.array(grid), (size_x, size_y)), interpolation='nearest')
+        plt.show()
 
     
 if __name__ == '__main__':
