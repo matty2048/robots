@@ -18,11 +18,15 @@ class Position:
         self.theta : float = theta
 
 class Main:
+    SLEEP_RATE = 5
     def __init__(self):
         pass
 
     def run(self):
-        pass
+        r = rospy.Rate(self.SLEEP_RATE)
+        r.sleep()
+        while not rospy.is_shutdown():
+            
 
 if __name__ == '__main__':
     try:
