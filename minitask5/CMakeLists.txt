@@ -45,5 +45,7 @@ catkin_install_python(PROGRAMS
   scripts/image_proc.py
   scripts/object_avoid.py
   scripts/search.py
+  scripts/localisation.py
+  scripts/mapping.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
