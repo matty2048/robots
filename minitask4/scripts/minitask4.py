@@ -30,10 +30,9 @@ class map_navigation():
         self.res = 0.05
         self.size_x = 384
         self.size_y = 384
-        self.grid : list[int] = []
-        for i in range(384*384):
-            self.grid.append(-1)
+        self.grid : list[int] = [-1]*self.size_x*self.size_y
         self.origin_ = (-10, -10)
+        # self.origin = (-2.7, 1.1)
         self.old_grid = OccupancyGrid()
         self.occ_pub = rospy.Publisher('/map', OccupancyGrid, queue_size=10)
         rospy.Subscriber('scan', LaserScan, self.callback_laser)
@@ -185,7 +184,7 @@ class map_navigation():
         #self.moveToGoal(-5.5,3.5)
         #self.moveToGoal(4.2,4.2)
         # resolution
-        r = rospy.Rate(5)
+        r = rospy.Rate(2)
         print("here")
         while not self.grid:
             r.sleep()
@@ -193,33 +192,35 @@ class map_navigation():
         
         print("size_x={size_x}, size_y={size_y}, grid size={grid_size}, origin_={pos}".format(size_x=self.size_x, size_y=self.size_y, grid_size=np.array(self.grid).size, pos=self.origin_))
         print(self.to_grid(self.pos.x, self.pos.y, self.origin_, size, self.res))
+
         while not rospy.is_shutdown():
             points = self.filter_min_max(self.ranges)
             cur_pos = self.to_grid(self.pos.x, self.pos.y, self.origin_, size, self.res)
             cur_angle = self.pos.theta
             for i in range(len(points)):
                 if points[i] == 0: continue
-                rads = radians(i) + cur_angle
+                rads = (radians(i) + cur_angle - math.pi/2) 
                 # Suspect this is the cause behind the flipping ?
-                endpos = self.to_grid(self.pos.x + points[i] * math.sin(rads), self.pos.y + points[i] * math.cos(rads), self.origin_, size, self.res)
-                gridpoints = self.get_line(cur_pos, endpos)
+                endpos = self.to_grid(self.pos.x + points[i] * -math.sin(rads), self.pos.y + points[i] * math.cos(rads), self.origin_, size, self.res)
+                # A = [[math.cos(rads), -math.sin(rads)], [math.sin(rads), math.cos(rads)]]
+                # S = [points[i], 0]
+                # result = np.matmul(A, S)
+                # endpos = self.to_grid(self.pos.x + result[0], self.pos.y + result[1], self.origin_, size, self.res)
 
+                gridpoints = self.get_line(cur_pos, endpos)
                 for j in range(len(gridpoints)-1):
-                    temp = (gridpoints[j][0], gridpoints[j][1])
+                    temp = (gridpoints[j][1], gridpoints[j][0])
                     self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 0
-                temp = (gridpoints[-1][0], gridpoints[-1][1])
+                temp = (gridpoints[-1][1], gridpoints[-1][0])
                 self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 100
             self.old_grid.data = self.grid
             self.old_grid.info.height = self.size_y
             self.old_grid.info.width = self.size_x
             self.old_grid.info.resolution = self.res
-            self.old_grid.info.origin.position.x = self.origin_[0]
-            self.old_grid.info.origin.position.y = self.origin_[1]
-            
+            self.old_grid.info.origin.position.x = self.origin_[0]# self.to_world(self.origin_[0], self.origin_[1], self.origin_, self.size_x,self.res)[0]
+            self.old_grid.info.origin.position.y = self.origin_[1]# self.to_world(self.origin_[0], self.origin_[1], self.origin_, self.size_x,self.res)[1]
             self.occ_pub.publish(self.old_grid)
             r.sleep()
-        plt.imshow(np.reshape(np.array(self.grid), (self.size_x, self.size_y)), interpolation='nearest')
-        plt.show()
 
     
 if __name__ == '__main__':
