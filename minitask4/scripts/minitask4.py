@@ -20,36 +20,22 @@ class Position:
 
 class map_navigation():
 
-    def __init__(self):
-        self.goalReached = False
-        # initiliaze
+    def __init__(self, res = 0.05, size= (20,20), origin = (-10, -10), threshold = 0.6):
         self.pos = Position(0, 0, 0)
         self.ranges = [0]*360
         self.range_min = 0.118
         self.range_max = 3.5
-        self.res = 0.05
-        self.size_x = 384
-        self.size_y = 384
+        self.res = res
+        self.size_x = size[0]*int(1/res)
+        self.size_y = size[1]*int(1/res)
         self.grid : list[int] = [-1]*self.size_x*self.size_y
-        self.origin_ = (-10, -10)
-        # self.origin = (-2.7, 1.1)
+        self.origin_ = origin
+        self.threshold = threshold
         self.old_grid = OccupancyGrid()
         self.occ_pub = rospy.Publisher('/map', OccupancyGrid, queue_size=10)
         rospy.Subscriber('scan', LaserScan, self.callback_laser)
         rospy.Subscriber('odom', Odometry, self.callback_odom)
-        # self.occ_sub = rospy.Subscriber('OccupancyGrid', OccupancyGrid, self.callback_occ)
         rospy.init_node('map_navigation', anonymous=False)
-        choice = 0
-
-    def callback_occ(self, msg):
-        print("in callback")
-        self.res = msg.info.resolution
-        self.origin_ = (msg.info.origin.position.x, msg.info.origin.position.y)
-        self.size_x = msg.info.width
-        self.size_y = msg.info.height
-        self.grid = [-1]*(self.size_x*self.size_y)
-        self.old_grid = msg
-        self.occ_sub.unregister()
     
     def callback_laser(self, msg):
         self.ranges = msg.ranges
@@ -179,47 +165,44 @@ class map_navigation():
         points = [x if (x < self.range_max and x > self.range_min) else 0 for x in points]
         return points
 
+
+    def pub_occ_grid(self):
+        self.old_grid.data = self.grid
+        self.old_grid.info.height = self.size_y
+        self.old_grid.info.width = self.size_x
+        self.old_grid.info.resolution = self.res
+        self.old_grid.info.origin.position.x = self.origin_[0]# self.to_world(self.origin_[0], self.origin_[1], self.origin_, self.size_x,self.res)[0]
+        self.old_grid.info.origin.position.y = self.origin_[1]# self.to_world(self.origin_[0], self.origin_[1], self.origin_, self.size_x,self.res)[1]
+
+        self.occ_pub.publish(self.old_grid)
+
+
     def run(self):
-        #self.moveToGoal(-1.45,4.13)
-        #self.moveToGoal(-5.5,3.5)
-        #self.moveToGoal(4.2,4.2)
-        # resolution
         r = rospy.Rate(2)
-        print("here")
         while not self.grid:
             r.sleep()
         size = (self.size_x*self.res, self.size_y*self.res)
         
         print("size_x={size_x}, size_y={size_y}, grid size={grid_size}, origin_={pos}".format(size_x=self.size_x, size_y=self.size_y, grid_size=np.array(self.grid).size, pos=self.origin_))
-        print(self.to_grid(self.pos.x, self.pos.y, self.origin_, size, self.res))
-
+        past_grids = []
         while not rospy.is_shutdown():
+            past_grids.append(self.grid)
             points = self.filter_min_max(self.ranges)
             cur_pos = self.to_grid(self.pos.x, self.pos.y, self.origin_, size, self.res)
             cur_angle = self.pos.theta
             for i in range(len(points)):
                 if points[i] == 0: continue
                 rads = (radians(i) + cur_angle - math.pi/2) 
-                # Suspect this is the cause behind the flipping ?
                 endpos = self.to_grid(self.pos.x + points[i] * -math.sin(rads), self.pos.y + points[i] * math.cos(rads), self.origin_, size, self.res)
-                # A = [[math.cos(rads), -math.sin(rads)], [math.sin(rads), math.cos(rads)]]
-                # S = [points[i], 0]
-                # result = np.matmul(A, S)
-                # endpos = self.to_grid(self.pos.x + result[0], self.pos.y + result[1], self.origin_, size, self.res)
-
                 gridpoints = self.get_line(cur_pos, endpos)
                 for j in range(len(gridpoints)-1):
                     temp = (gridpoints[j][1], gridpoints[j][0])
                     self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 0
                 temp = (gridpoints[-1][1], gridpoints[-1][0])
                 self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 100
-            self.old_grid.data = self.grid
-            self.old_grid.info.height = self.size_y
-            self.old_grid.info.width = self.size_x
-            self.old_grid.info.resolution = self.res
-            self.old_grid.info.origin.position.x = self.origin_[0]# self.to_world(self.origin_[0], self.origin_[1], self.origin_, self.size_x,self.res)[0]
-            self.old_grid.info.origin.position.y = self.origin_[1]# self.to_world(self.origin_[0], self.origin_[1], self.origin_, self.size_x,self.res)[1]
-            self.occ_pub.publish(self.old_grid)
+            self.pub_occ_grid()
+            if len(past_grids) >= 5:
+                past_grids.pop(0)
             r.sleep()
 
     
