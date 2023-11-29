@@ -6,7 +6,7 @@ from sensor_msgs.msg import LaserScan
 import tf
 import math
 import numpy as np
-import queue
+import queue\
 
 class Position:
     def __init__(self,x,y,theta):

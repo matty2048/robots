@@ -26,7 +26,7 @@ class Main:
         r = rospy.Rate(self.SLEEP_RATE)
         r.sleep()
         while not rospy.is_shutdown():
-            
+            pass
 
 if __name__ == '__main__':
     try:
