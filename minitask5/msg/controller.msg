@@ -1,0 +1,4 @@
+int8 state_object_avoid
+int8 direction_object_avoid
+int8 state_find_goal
+int8 state_random_walk
