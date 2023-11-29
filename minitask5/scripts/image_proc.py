@@ -1,92 +1,114 @@
+from math import isnan, nan
 import rospy
 from std_msgs.msg import String
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
+from sensor_msgs.msg import PointCloud2
 from sensor_msgs.msg import LaserScan, Image
-from minitask5.msg import image_proc
 import numpy as np
+import random
 import cv2, cv_bridge
+import queue
 import tf
-
+from struct import * 
 class Position:
     def __init__(self,x,y,theta):
         self.x : float = x 
         self.y : float = y
         self.theta : float = theta
 
-class ImageProcessor:
-    SLEEP_RATE = 5
 
-    def __init__(self):
+class Point:
+    def __init__(self, x, y, z, rgb) -> None:
+        self.x : float = x
+        self.y : float = y
+        self.z : float = z
+        self.rgb : float = rgb
+
+class Camera:
+    SLEEP_RATE = 5
+    def __init__(self) -> None:
         self.bridge = cv_bridge.CvBridge()
-        cv2.namedWindow("original", 1)
+        #cv2.namedWindow("original", 1)
         self.image_sub = rospy.Subscriber('camera/rgb/image_raw', Image, self.image_callback)
-        self.image_proc_pub = rospy.Publisher('mt5_control', image_proc, queue_size=10)
-        rospy.Subscriber('scan', LaserScan, self.callback_laser)
-        rospy.Subscriber('odom', Odometry, self.callback_odom)
-        self.pos = Position(0, 0, 0)
+        self.depth_sub = rospy.Subscriber('camera/depth/points', PointCloud2, self.depth_callback)
+
         self.image_resized = []
-        self.pos_pub = rospy.Publisher('cmd_vel', Twist, queue_size=10)
-        # self.ranges = [0]*360
-        # self.range_min = 0.118
-        # self.range_max = 3.5
         self.mask = []
         self.image = []
         self.width = 0
-        rospy.init_node('ImageProcessor', anonymous=True)
+        self.height = 0
+        self.depth_points = []
+        self.depth_ready = False
+        self.img_ready = False
         cv2.startWindowThread()
-
+    
     def image_callback(self, msg):
         self.image = self.bridge.imgmsg_to_cv2(msg,desired_encoding='bgr8')
-        hsv = cv2.cvtColor(self.image, cv2.COLOR_BGR2HSV)
-        h = hsv[:, :, 0]
-        self.mask = cv2.inRange(h, 50, 70)
-        self.image = cv2.bitwise_and(self.image, self.image, mask = self.mask)
         (h, w) = self.image.shape[:2]
+        self.image = cv2.resize(self.image, (int(w/4),int(h/4)))
+        hsv = cv2.cvtColor(self.image, cv2.COLOR_BGR2HSV)
+        #h = hsv[:, :, 0]
+        lowerValues = np.array([90, 160, 160])
+        upperValues = np.array([128, 255, 255])
+        self.mask = cv2.inRange(hsv, lowerValues, upperValues)
+        self.image = cv2.bitwise_and(self.image, self.image, mask = self.mask)
+        # open the image with a kernel
+        
         self.width = w
-        self.image_resized = cv2.resize(self.image, (int(w/4),int(h/4)))
-        cv2.imshow("original", np.array(self.image_resized))
-        cv2.waitKey(0)
+        self.height = h
+        cv2.imshow("opened image", self.image)
+        self.img_ready = True
     
-    def callback_laser(self, msg):
-        self.ranges = msg.ranges
-
-    def callback_odom(self, msg):
-        quarternion = [msg.pose.pose.orientation.x,msg.pose.pose.orientation.y,msg.pose.pose.orientation.z, msg.pose.pose.orientation.w]
-        (roll, pitch, yaw) = tf.transformations.euler_from_quaternion(quarternion)
-        self.pos.theta = yaw
-        self.pos.x = msg.pose.pose.position.x
-        self.pos.y = msg.pose.pose.position.y
-
-    def green_dist(self):
-        if(np.size(self.image_resized) == 0): return
-        # calculate moments of binary image
-        M = cv2.moments(self.mask)
-
-        # calculate x,y coordinate of center
-        cX = int(M["m10"] / (M["m00"] + 1))
-        cY = int(M["m01"] / (M["m00"] + 1))
-
-        centre_mass = (cX, cY)
-        cv2.circle(self.image, centre_mass, 10, (0,0,255), 2)
-        return centre_mass
+    def xytoidx(self, x, y):
+        return 1920*y + x
     
+    def depth_callback(self, msg):      
+        for f in msg.fields:
+            print(f.name, f.offset, f.datatype, f.count)
+        #4147200
+        #2073600
+        print(msg.point_step)
+        float_iter = iter_unpack("8f", msg.data)
+        #l = len(list(float_iter))
+        #print(l)
+        
+        pointcloud = np.zeros(((1920 * 1080),4))
+        i = 0
+        for x in float_iter:
+           pointcloud[i][0] = x[0]
+           pointcloud[i][1] = x[1]
+           pointcloud[i][2] = x[2]
+           pointcloud[i][3] = x[4]
+           i = i + 1
+        self.depth_points = pointcloud
+        self.depth_ready = True
+
+    def getBlueIdxs(self):
+        return np.transpose(np.nonzero(self.mask))
+         
+
     def run(self):
         r = rospy.Rate(self.SLEEP_RATE)
         r.sleep()
         while not rospy.is_shutdown():
 
-            # TODO: PROCESS IMAGE + PUBLISH MSG
-            # PUBLISH A LIST OF LOCATIONS WHERE GREEN/RED/BLUE OBJECTS ARE LOCATED
-            # 
-
-
+            if not (self.depth_ready and self.img_ready):
+                r.sleep()
+                continue
+            #indexes = self.getBlueIdxs()
+            #if indexes.any():
+            #    print(self.depth_points[self.xytoidx(indexes[0][1] * 4,indexes[0][0] * 4)][2])
             r.sleep()
+        pass
+
+
 
 if __name__ == '__main__':
     try:
-        image_processor = ImageProcessor()
-        image_processor.run()
-        pass
+        rospy.init_node('follower')
+        camera = Camera()
+        camera.run()
+        rospy.spin()
     except rospy.ROSInterruptException:
-        pass   
+        pass

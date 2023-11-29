@@ -58,7 +58,6 @@ class Main:
         r = rospy.Rate(self.SLEEP_RATE)
         # Whilst not shutdown OR Found all objects
         while not rospy.is_shutdown():
-            
             self.control_pub.publish(controller(state_object_avoid = 1))
             # If no green objects in sight
                 # Random Walk
