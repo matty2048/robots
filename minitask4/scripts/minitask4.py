@@ -6,6 +6,7 @@ from actionlib_msgs.msg import *
 from geometry_msgs.msg import Point
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry, OccupancyGrid, MapMetaData
+from nav_msgs.srv import GetMap
 from sensor_msgs.msg import LaserScan, Image
 import tf
 import numpy as np
@@ -20,22 +21,38 @@ class Position:
 
 class map_navigation():
 
-    def __init__(self, res = 0.05, size= (20,20), origin = (-10, -10), threshold = 0.6):
+    def __init__(self, res = 0.05, size= (20,20), origin = (-10, -10), threshold = 0.65):
         self.pos = Position(0, 0, 0)
         self.ranges = [0]*360
         self.range_min = 0.118
         self.range_max = 3.5
         self.res = res
-        self.size_x = size[0]*int(1/res)
-        self.size_y = size[1]*int(1/res)
-        self.grid : list[int] = [-1]*self.size_x*self.size_y
+        self.size_x = 384 # size[0]*int(1/res)
+        self.size_y = 384 # size[1]*int(1/res)
         self.origin_ = origin
         self.threshold = threshold
         self.old_grid = OccupancyGrid()
+        self.grid : list[int] = [-1]*self.size_x*self.size_y
+        try:
+            self.grid = self.get_map_client()
+        except:
+            pass
+        
         self.occ_pub = rospy.Publisher('/map', OccupancyGrid, queue_size=10)
         rospy.Subscriber('scan', LaserScan, self.callback_laser)
         rospy.Subscriber('odom', Odometry, self.callback_odom)
         rospy.init_node('map_navigation', anonymous=False)
+    
+    def get_map_client(self):
+        rospy.wait_for_service('/static_map')
+        try:
+            static_map = rospy.ServiceProxy('/static_map', GetMap)
+            resp1 = static_map()
+            # print(list(resp1.map.data))
+            return list(resp1.map.data)
+        except rospy.ServiceException as e:
+            # print("Service call failed: %s"%e)
+            pass
     
     def callback_laser(self, msg):
         self.ranges = msg.ranges
@@ -166,7 +183,7 @@ class map_navigation():
         return points
 
 
-    def pub_occ_grid(self):
+    def pub_occ_grid(self, past_grids):
         self.old_grid.data = self.grid
         self.old_grid.info.height = self.size_y
         self.old_grid.info.width = self.size_x
@@ -174,11 +191,15 @@ class map_navigation():
         self.old_grid.info.origin.position.x = self.origin_[0]# self.to_world(self.origin_[0], self.origin_[1], self.origin_, self.size_x,self.res)[0]
         self.old_grid.info.origin.position.y = self.origin_[1]# self.to_world(self.origin_[0], self.origin_[1], self.origin_, self.size_x,self.res)[1]
 
+        publish_grid = [int(sum(x)/len(past_grids)) for x in zip(*past_grids)]
+        publish_grid = [x if x >= 0 else -1 for x in publish_grid]
+        self.old_grid.data = publish_grid
+        # print(publish_grid)
         self.occ_pub.publish(self.old_grid)
 
 
     def run(self):
-        r = rospy.Rate(2)
+        r = rospy.Rate(1)
         while not self.grid:
             r.sleep()
         size = (self.size_x*self.res, self.size_y*self.res)
@@ -186,21 +207,29 @@ class map_navigation():
         print("size_x={size_x}, size_y={size_y}, grid size={grid_size}, origin_={pos}".format(size_x=self.size_x, size_y=self.size_y, grid_size=np.array(self.grid).size, pos=self.origin_))
         past_grids = []
         while not rospy.is_shutdown():
-            past_grids.append(self.grid)
             points = self.filter_min_max(self.ranges)
             cur_pos = self.to_grid(self.pos.x, self.pos.y, self.origin_, size, self.res)
             cur_angle = self.pos.theta
             for i in range(len(points)):
                 if points[i] == 0: continue
+                if (abs(points[i] - points[(i + 1) % 360]) > 0.2 ) or (abs(points[i] - points[(i - 1) %360]) > 0.2 ): continue
                 rads = (radians(i) + cur_angle - math.pi/2) 
-                endpos = self.to_grid(self.pos.x + points[i] * -math.sin(rads), self.pos.y + points[i] * math.cos(rads), self.origin_, size, self.res)
+                endpos = self.to_grid(self.pos.x + (points[i] + 0.1) * -math.sin(rads), self.pos.y + (points[i] + 0.1) * math.cos(rads), self.origin_, size, self.res)
                 gridpoints = self.get_line(cur_pos, endpos)
                 for j in range(len(gridpoints)-1):
                     temp = (gridpoints[j][1], gridpoints[j][0])
                     self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 0
+
+                temp = (gridpoints[-3][1], gridpoints[-3][0])
+                self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 100
+                temp = (gridpoints[-2][1], gridpoints[-2][0])
+                self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 100
                 temp = (gridpoints[-1][1], gridpoints[-1][0])
                 self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 100
-            self.pub_occ_grid()
+
+            past_grids.append(self.grid)
+            self.pub_occ_grid(past_grids)
+            # print(len(past_grids))
             if len(past_grids) >= 5:
                 past_grids.pop(0)
             r.sleep()
