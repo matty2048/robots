@@ -6,6 +6,8 @@ from nav_msgs.msg import Odometry
 from sensor_msgs.msg import PointCloud2
 from sensor_msgs.msg import LaserScan, Image
 import numpy as np
+import pylab as plt
+from PIL import Image as im
 import random
 import cv2, cv_bridge
 import queue
@@ -34,7 +36,9 @@ class Camera:
         self.depth_sub = rospy.Subscriber('camera/depth/points', PointCloud2, self.depth_callback)
 
         self.image_resized = []
-        self.mask = []
+        self.blueMask = []
+        self.redMask = []
+        self.greenMask = []
         self.image = []
         self.width = 0
         self.height = 0
@@ -48,16 +52,31 @@ class Camera:
         (h, w) = self.image.shape[:2]
         self.image = cv2.resize(self.image, (int(w/4),int(h/4)))
         hsv = cv2.cvtColor(self.image, cv2.COLOR_BGR2HSV)
+        hsl = cv2.cvtColor(self.image, cv2.COLOR_BGR2HLS)
         #h = hsv[:, :, 0]
-        lowerValues = np.array([90, 160, 160])
-        upperValues = np.array([128, 255, 255])
-        self.mask = cv2.inRange(hsv, lowerValues, upperValues)
-        self.image = cv2.bitwise_and(self.image, self.image, mask = self.mask)
+        blueLowerValues = np.array([90, 160, 160])
+        blueUpperValues = np.array([128, 255, 255])
+        self.blueMask = cv2.inRange(hsv, blueLowerValues, blueUpperValues)
+        
+        greenLowerValues = np.array([40, 200, 20])
+        greenUpperValues = np.array([70, 255, 255])
+        self.greenMask = cv2.inRange(hsv, greenLowerValues, greenUpperValues)
+        
+        redLowerValues1 = np.array([0,10, 200])
+        redUpperValues1 = np.array([1, 255, 255])
+        redLowerValues2 = np.array([170, 10, 200])
+        redUpperValues2 = np.array([255, 255, 255])
+
+        redMask1 = cv2.inRange(hsl, redLowerValues1, redUpperValues1)
+        redMask2 = cv2.inRange(hsl, redLowerValues2, redUpperValues2)
+        self.redMask = redMask1  + redMask2 
+
+        self.image = cv2.bitwise_and(self.image, self.image, mask = self.greenMask)
         # open the image with a kernel
         
         self.width = w
         self.height = h
-        cv2.imshow("opened image", self.image)
+        cv2.imshow("image", self.image)
         self.img_ready = True
     
     def xytoidx(self, x, y):
@@ -72,7 +91,7 @@ class Camera:
         float_iter = iter_unpack("8f", msg.data)
         #l = len(list(float_iter))
         #print(l)
-        
+        pointColour = np.zeros((1080,1920))
         pointcloud = np.zeros(((1920 * 1080),4))
         i = 0
         for x in float_iter:
@@ -80,12 +99,14 @@ class Camera:
            pointcloud[i][1] = x[1]
            pointcloud[i][2] = x[2]
            pointcloud[i][3] = x[4]
+           #print(x[4])
            i = i + 1
         self.depth_points = pointcloud
         self.depth_ready = True
+        
 
     def getBlueIdxs(self):
-        return np.transpose(np.nonzero(self.mask))
+        return np.transpose(np.nonzero(self.blueMask))
          
 
     def run(self):
