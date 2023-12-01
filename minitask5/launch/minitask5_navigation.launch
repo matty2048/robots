@@ -1,32 +1,9 @@
 <launch>
   <!-- Arguments -->
-  <!-- <arg name="x_pos" default="-1.1"/>
-  <arg name="y_pos" default="4.2"/>
-  <arg name="z_pos" default="0.0"/>
-  <arg name="a_theta" default="0.0"/> -->
-
   <arg name="model" default="$(env TURTLEBOT3_MODEL)" doc="model type [burger, waffle, waffle_pi]"/>
   <arg name="map_file" default="$(find minitask5)/maps/train_env.yaml"/>
   <arg name="open_rviz" default="true"/>
   <arg name="move_forward_only" default="true"/>
-
-  <node name="main" pkg="minitask5" type="main.py" output="screen">
-      <param name="max_green_boxes"             value="2"/>
-      <param name="max_red_hydrants"            value="2"/>
-  </node>
-  <!-- <node name="goal_finder" pkg="minitask5" type="goal_finder.py" output="screen"/> -->
-  <!-- <node name="image_processor" pkg="minitask5" type="image_proc.py" output="screen"/> -->
-  <!-- <node name="object_avoid" pkg="minitask5" type="object_avoid.py" output="screen"/> -->
-  <!-- <node name="search" pkg="minitask5" type="search.py" output="screen"/> -->
-  <!-- <node name="localisation" pkg="minitask5" type="localisation.py" output="screen"/> -->
-  <node name="mapping" pkg="minitask5" type="mapping.py" output="screen"/>
-
-  <!-- Navigation -->
-  <!-- <include file="$(find minitask5)/launch/minitask5_navigation.launch"> -->
-      <!-- <arg name="x_nav_pos"   value="-1.3"/> -->
-  <!-- </include> -->
-
-  <!-- Arguments -->
   <!-- <arg name="x_nav_pos" default="-1.3"/>
   <arg name="y_nav_pos" default="4.2"/>
   <arg name="a_nav_theta" default="0.0"/> -->
@@ -53,4 +30,10 @@
     <arg name="model" value="$(arg model)" />
     <arg name="move_forward_only" value="$(arg move_forward_only)"/>
   </include>
+
+  <!-- rviz -->
+  <!-- <group if="$(arg open_rviz)"> 
+    <node pkg="rviz" type="rviz" name="rviz" required="true"
+          args="-d $(find turtlebot3_navigation)/rviz/turtlebot3_navigation.rviz"/>
+  </group> -->
 </launch>
