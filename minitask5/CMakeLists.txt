@@ -12,6 +12,7 @@ add_message_files(
   controller.msg
   image_proc.msg
   object_data.msg
+  frontiers.msg
 )
 
 generate_messages(
@@ -39,7 +40,7 @@ include_directories(
 
 catkin_install_python(PROGRAMS
   scripts/main.py
-  scripts/goal_finder.py
+  scripts/frontier_finder.py
   scripts/image_proc.py
   scripts/object_avoid.py
   scripts/search.py
