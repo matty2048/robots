@@ -16,9 +16,9 @@ class Position:
         self.y : float = y
         self.theta : float = theta
 
-class map_navigation():
+class frontier_mapping():
 
-    def __init__(self, res = 0.05, origin = (-10, -10), threshold = 0.65):
+    def __init__(self, res = 0.10, origin = (-10, -10), threshold = 0.65):
         self.pos = Position(0,0,0)
         self.ranges = [0]*360
         self.range_min = 0.118
@@ -29,25 +29,20 @@ class map_navigation():
         self.corr_x = 0.3
         try:
             current_map = self.get_map_client()
-            self.size_x = current_map.info.width
-            self.size_y = current_map.info.height
-            self.res = current_map.info.resolution
             self.origin_ = (current_map.info.origin.position.x, current_map.info.origin.position.y)
-            new_map = self.adjust_map(int(0/self.res), int(0/self.res), self.size_x, list(current_map.data))
-            self.grid = new_map
-
         except:
             print("Failed to retrieve map")
-            self.size_x = 384
-            self.size_y = 384
-            self.grid : list[int] = [-1]*self.size_x*self.size_y
             self.origin_ = origin
-            self.res = res
 
-        self.occ_pub = rospy.Publisher('/map', OccupancyGrid, queue_size=10)
+        self.size_x = int(current_map.info.width/2)
+        self.size_y = int(current_map.info.height/2)
+        self.res = res
+        self.grid : list[int] = [-1]*self.size_x*self.size_y
+
+        self.occ_pub = rospy.Publisher('/map_frontier', OccupancyGrid, queue_size=10)
         rospy.Subscriber('scan', LaserScan, self.callback_laser)
         rospy.Subscriber('odom', Odometry, self.callback_odom)
-        rospy.init_node('map_navigation', anonymous=True)
+        rospy.init_node('map_frontier', anonymous=True)
     
     def callback_laser(self, msg):
         self.ranges = msg.ranges
@@ -82,7 +77,6 @@ class map_navigation():
         offsetx = (1/resolution)*(px - origin_[1] + self.corr_x)
         offsety = (1/resolution)*(py - origin_[0])
         return (int(offsetx), int(offsety))
-        
         
     def to_world(self, gx, gy, origin, resolution):
         offsetx = (resolution)*gx + origin[1]
@@ -212,7 +206,7 @@ if __name__ == '__main__':
     try:
 
         rospy.loginfo("You have reached the destination")
-        thing = map_navigation()
+        thing = frontier_mapping()
         thing.run()
         rospy.spin()
 
