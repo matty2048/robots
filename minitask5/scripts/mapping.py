@@ -26,7 +26,6 @@ class map_navigation():
         self.threshold = threshold
         self.old_grid = OccupancyGrid()
         self.objects_found = []
-        self.odom = None
         self.corr_x = 0.3
         try:
             current_map = self.get_map_client()
@@ -61,7 +60,6 @@ class map_navigation():
         self.pos.theta = yaw
         self.pos.x = msg.pose.pose.position.x
         self.pos.y = msg.pose.pose.position.y 
-        self.odom = msg
     
     def get_map_client(self):
         rospy.wait_for_service('/static_map')
@@ -173,6 +171,7 @@ class map_navigation():
         publish_grid = [x if x >= 0 else -1 for x in publish_grid]
         self.old_grid.data = publish_grid
         self.occ_pub.publish(self.old_grid)
+        return publish_grid
 
 
     def run(self):
