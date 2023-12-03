@@ -1,8 +1,9 @@
 import rospy
 from math import radians, degrees
 from actionlib_msgs.msg import *
+from geometry_msgs.msg import Quaternion, PoseWithCovarianceStamped, PoseWithCovariance, Pose
 from nav_msgs.msg import Odometry, OccupancyGrid, MapMetaData
-from nav_msgs.srv import GetMap
+from nav_msgs.srv import GetMap, SetMap
 from sensor_msgs.msg import LaserScan
 from minitask5.msg import object_data
 import tf
@@ -17,35 +18,31 @@ class Position:
 
 class frontier_mapping():
 
-    def __init__(self, res = 0.1, origin = (-10, -10), threshold = 0.65, size = (20, 20)):
+    def __init__(self, res = 0.10, origin = (-10, -10), threshold = 0.65):
         self.pos = Position(0,0,0)
         self.ranges = [0]*360
         self.range_min = 0.118
         self.range_max = 3.5
-        self.old_grid = OccupancyGrid()
         self.threshold = threshold
-        self.res = res
+        self.old_grid = OccupancyGrid()
         self.objects_found = []
-        self.size_x = int(size[0]/res)
-        self.size_y = int(size[1]/res)
+        self.corr_x = 0.3
+        try:
+            current_map = self.get_map_client()
+            self.origin_ = (current_map.info.origin.position.x, current_map.info.origin.position.y)
+        except:
+            print("Failed to retrieve map")
+            self.origin_ = origin
+
+        self.size_x = int(current_map.info.width/2)
+        self.size_y = int(current_map.info.height/2)
+        self.res = res
         self.grid : list[int] = [-1]*self.size_x*self.size_y
-        # SHODDY FIX WITH OFFSET FOR MAPPING ISSUES
-        self.origin_ = (origin[0], origin[1] - 0.25)
-        # try:
-        #     current_map = self.get_map_client()
-        #     self.grid = list(current_map.data)
-        #     self.size_x = current_map.info.width
-        #     self.size_y = current_map.info.height
-        #     self.res = current_map.info.resolution
-        #     # SHODDY FIX WITH OFFSET FOR MAPPING ISSUES
-        #     self.origin_ = (current_map.info.origin.position.x, current_map.info.origin.position.y - 0.25)
-        # except:
-        #     print("Failed to retrieve map")
-            
+
         self.occ_pub = rospy.Publisher('/map_frontier', OccupancyGrid, queue_size=10)
         rospy.Subscriber('scan', LaserScan, self.callback_laser)
         rospy.Subscriber('odom', Odometry, self.callback_odom)
-        rospy.init_node('frontier_mapping', anonymous=False)
+        rospy.init_node('map_frontier', anonymous=True)
     
     def callback_laser(self, msg):
         self.ranges = msg.ranges
@@ -57,10 +54,27 @@ class frontier_mapping():
         (roll, pitch, yaw) = tf.transformations.euler_from_quaternion(quarternion) # type: ignore
         self.pos.theta = yaw
         self.pos.x = msg.pose.pose.position.x
-        self.pos.y = msg.pose.pose.position.y
+        self.pos.y = msg.pose.pose.position.y 
+    
+    def get_map_client(self):
+        rospy.wait_for_service('/static_map')
+        try:
+            static_map = rospy.ServiceProxy('/static_map', GetMap)
+            resp1 = static_map()
+            # print(list(resp1.map.data))
+            return resp1.map
+        except rospy.ServiceException as e:
+            # print("Service call failed: %s"%e)
+            pass
+    
+    def adjust_map(self, x_cells, y_cells, size_x, old_map):
+        new_map = np.reshape(np.array(old_map), (-1, size_x))
+        new_map = np.roll(new_map, x_cells, axis=0)
+        new_map = np.roll(new_map, y_cells, axis=1)
+        return new_map.flatten().tolist()
     
     def to_grid(self, px, py, origin_, resolution):
-        offsetx = (1/resolution)*(px - origin_[1])
+        offsetx = (1/resolution)*(px - origin_[1] + self.corr_x)
         offsety = (1/resolution)*(py - origin_[0])
         return (int(offsetx), int(offsety))
         
@@ -151,6 +165,7 @@ class frontier_mapping():
         publish_grid = [x if x >= 0 else -1 for x in publish_grid]
         self.old_grid.data = publish_grid
         self.occ_pub.publish(self.old_grid)
+        return publish_grid
 
 
     def run(self):
@@ -158,34 +173,31 @@ class frontier_mapping():
         while not self.grid:
             r.sleep()
         
-        print("Frontier mapping: size_x={size_x}, size_y={size_y}, grid size={grid_size}, origin_={pos}".format(size_x=self.size_x, size_y=self.size_y, grid_size=np.array(self.grid).size, pos=self.origin_))
+        print("size_x={size_x}, size_y={size_y}, grid size={grid_size}, origin_={pos}".format(size_x=self.size_x, size_y=self.size_y, grid_size=np.array(self.grid).size, pos=self.origin_))
         past_grids = []
         print(self.pos.x, self.pos.y, self.pos.theta)
         while not rospy.is_shutdown():
+            past_grids.append(self.grid)
             points = self.filter_min_max(self.ranges)
             cur_pos = self.to_grid(self.pos.x, self.pos.y, self.origin_, self.res)
             cur_angle = self.pos.theta
             for i in range(len(points)):
                 if points[i] == 0: continue
-                if (abs(points[i] - points[(i + 1) % 360]) > 0.2 ) or (abs(points[i] - points[(i - 1) %360]) > 0.2 ): continue
+                if i % 2 == 0: continue
+                if (abs(points[i] - points[(i + 1) % 360]) > 0.15 ) and (abs(points[i] - points[(i - 1) %360]) > 0.15 ): continue
                 rads = (radians(i) + cur_angle - math.pi/2) 
                 endpos = self.to_grid(self.pos.x + (points[i]) * -math.sin(rads), self.pos.y + (points[i]) * math.cos(rads), self.origin_, self.res)
                 gridpoints = self.get_line(cur_pos, endpos)
                 for j in range(len(gridpoints)-1):
                     temp = (gridpoints[j][1], gridpoints[j][0])
                     self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 0
-
-                # temp = (gridpoints[-3][1], gridpoints[-3][0])
-                # self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 100
                 temp = (gridpoints[-2][1], gridpoints[-2][0])
                 self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 100
                 temp = (gridpoints[-1][1], gridpoints[-1][0])
                 self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 100
             self.place_object_at(object_data(rough_size = 0.5))
-            past_grids.append(self.grid)
-            self.pub_occ_grid(past_grids)
-            # print(len(past_grids))
-            if len(past_grids) >= 5:
+            self.grid = self.pub_occ_grid(past_grids)
+            if len(past_grids) >= 10:
                 past_grids.pop(0)
             r.sleep()
 

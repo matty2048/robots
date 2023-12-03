@@ -27,6 +27,7 @@ class map_navigation():
         self.old_grid = OccupancyGrid()
         self.objects_found = []
         self.odom = None
+        self.corr_x = 0.3
         try:
             current_map = self.get_map_client()
             self.size_x = current_map.info.width
@@ -80,7 +81,7 @@ class map_navigation():
         return new_map.flatten().tolist()
     
     def to_grid(self, px, py, origin_, resolution):
-        offsetx = (1/resolution)*(px - origin_[1] + 0.3)
+        offsetx = (1/resolution)*(px - origin_[1] + self.corr_x)
         offsety = (1/resolution)*(py - origin_[0])
         return (int(offsetx), int(offsety))
         
@@ -183,12 +184,14 @@ class map_navigation():
         past_grids = []
         print(self.pos.x, self.pos.y, self.pos.theta)
         while not rospy.is_shutdown():
+            past_grids.append(self.grid)
             points = self.filter_min_max(self.ranges)
             cur_pos = self.to_grid(self.pos.x, self.pos.y, self.origin_, self.res)
             cur_angle = self.pos.theta
             for i in range(len(points)):
                 if points[i] == 0: continue
-                if (abs(points[i] - points[(i + 1) % 360]) > 0.2 ) or (abs(points[i] - points[(i - 1) %360]) > 0.2 ): continue
+                if i % 2 == 0: continue
+                if (abs(points[i] - points[(i + 1) % 360]) > 0.15 ) and (abs(points[i] - points[(i - 1) %360]) > 0.15 ): continue
                 rads = (radians(i) + cur_angle - math.pi/2) 
                 endpos = self.to_grid(self.pos.x + (points[i]) * -math.sin(rads), self.pos.y + (points[i]) * math.cos(rads), self.origin_, self.res)
                 gridpoints = self.get_line(cur_pos, endpos)
@@ -200,9 +203,8 @@ class map_navigation():
                 temp = (gridpoints[-1][1], gridpoints[-1][0])
                 self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 100
             self.place_object_at(object_data(rough_size = 0.5))
-            past_grids.append(self.grid)
-            self.pub_occ_grid(past_grids)
-            if len(past_grids) >= 5:
+            self.grid = self.pub_occ_grid(past_grids)
+            if len(past_grids) >= 10:
                 past_grids.pop(0)
             r.sleep()
 
