@@ -45,5 +45,6 @@ catkin_install_python(PROGRAMS
   scripts/search.py
   scripts/localisation.py
   scripts/mapping.py
+  scripts/frontier_mapping.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )

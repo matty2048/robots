@@ -1,6 +1,7 @@
 import rospy
 from math import radians, degrees
 from actionlib_msgs.msg import *
+from geometry_msgs.msg import Quaternion
 from nav_msgs.msg import Odometry, OccupancyGrid, MapMetaData
 from nav_msgs.srv import GetMap
 from sensor_msgs.msg import LaserScan
@@ -27,12 +28,12 @@ class map_navigation():
         self.objects_found = []
         try:
             current_map = self.get_map_client()
-            self.grid = list(current_map.data)
             self.size_x = current_map.info.width
             self.size_y = current_map.info.height
             self.res = current_map.info.resolution
-            # SHODDY FIX WITH OFFSET FOR MAPPING ISSUES
-            self.origin_ = (current_map.info.origin.position.x, current_map.info.origin.position.y - 0.25)
+            self.origin_ = (current_map.info.origin.position.x, current_map.info.origin.position.y)
+            new_map = self.adjust_map(int(0/self.res), int(-0.3/self.res), self.size_x, list(current_map.data))
+            self.grid = new_map
         except:
             print("Failed to retrieve map")
             self.size_x = 384
@@ -44,7 +45,7 @@ class map_navigation():
         self.occ_pub = rospy.Publisher('/map', OccupancyGrid, queue_size=10)
         rospy.Subscriber('scan', LaserScan, self.callback_laser)
         rospy.Subscriber('odom', Odometry, self.callback_odom)
-        rospy.init_node('map_navigation', anonymous=False)
+        rospy.init_node('map_navigation', anonymous=True)
     
     def callback_laser(self, msg):
         self.ranges = msg.ranges
@@ -68,7 +69,13 @@ class map_navigation():
         except rospy.ServiceException as e:
             # print("Service call failed: %s"%e)
             pass
-
+    
+    def adjust_map(self, x_cells, y_cells, size_x, old_map):
+        new_map = np.reshape(np.array(old_map), (-1, size_x))
+        new_map = np.roll(new_map, x_cells, axis=0)
+        new_map = np.roll(new_map, y_cells, axis=1)
+        return new_map.flatten().tolist()
+    
     def to_grid(self, px, py, origin_, resolution):
         offsetx = (1/resolution)*(px - origin_[1])
         offsety = (1/resolution)*(py - origin_[0])
@@ -158,11 +165,9 @@ class map_navigation():
         self.old_grid.info.resolution = self.res
         self.old_grid.info.origin.position.x = self.to_world(0, 0, self.origin_, self.res)[0]
         self.old_grid.info.origin.position.y = self.to_world(0, 0, self.origin_, self.res)[1]
-
         publish_grid = [int(sum(x)/len(past_grids)) for x in zip(*past_grids)]
         publish_grid = [x if x >= 0 else -1 for x in publish_grid]
         self.old_grid.data = publish_grid
-        # print(publish_grid)
         self.occ_pub.publish(self.old_grid)
 
 

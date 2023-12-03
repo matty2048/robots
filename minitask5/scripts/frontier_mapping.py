@@ -15,36 +15,37 @@ class Position:
         self.y : float = y
         self.theta : float = theta
 
-class map_navigation():
+class frontier_mapping():
 
-    def __init__(self, res = 0.05, origin = (-10, -10), threshold = 0.65):
+    def __init__(self, res = 0.1, origin = (-10, -10), threshold = 0.65, size = (20, 20)):
         self.pos = Position(0,0,0)
         self.ranges = [0]*360
         self.range_min = 0.118
         self.range_max = 3.5
-        self.threshold = threshold
         self.old_grid = OccupancyGrid()
+        self.threshold = threshold
+        self.res = res
         self.objects_found = []
-        try:
-            current_map = self.get_map_client()
-            self.grid = list(current_map.data)
-            self.size_x = current_map.info.width
-            self.size_y = current_map.info.height
-            self.res = current_map.info.resolution
-            # SHODDY FIX WITH OFFSET FOR MAPPING ISSUES
-            self.origin_ = (current_map.info.origin.position.x, current_map.info.origin.position.y - 0.25)
-        except:
-            print("Failed to retrieve map")
-            self.size_x = 384
-            self.size_y = 384
-            self.grid : list[int] = [-1]*self.size_x*self.size_y
-            self.origin_ = origin
-            self.res = res
-
-        self.occ_pub = rospy.Publisher('/map', OccupancyGrid, queue_size=10)
+        self.size_x = int(size[0]/res)
+        self.size_y = int(size[1]/res)
+        self.grid : list[int] = [-1]*self.size_x*self.size_y
+        # SHODDY FIX WITH OFFSET FOR MAPPING ISSUES
+        self.origin_ = (origin[0], origin[1] - 0.25)
+        # try:
+        #     current_map = self.get_map_client()
+        #     self.grid = list(current_map.data)
+        #     self.size_x = current_map.info.width
+        #     self.size_y = current_map.info.height
+        #     self.res = current_map.info.resolution
+        #     # SHODDY FIX WITH OFFSET FOR MAPPING ISSUES
+        #     self.origin_ = (current_map.info.origin.position.x, current_map.info.origin.position.y - 0.25)
+        # except:
+        #     print("Failed to retrieve map")
+            
+        self.occ_pub = rospy.Publisher('/map_frontier', OccupancyGrid, queue_size=10)
         rospy.Subscriber('scan', LaserScan, self.callback_laser)
         rospy.Subscriber('odom', Odometry, self.callback_odom)
-        rospy.init_node('map_navigation', anonymous=False)
+        rospy.init_node('frontier_mapping', anonymous=False)
     
     def callback_laser(self, msg):
         self.ranges = msg.ranges
@@ -58,22 +59,10 @@ class map_navigation():
         self.pos.x = msg.pose.pose.position.x
         self.pos.y = msg.pose.pose.position.y
     
-    def get_map_client(self):
-        rospy.wait_for_service('/static_map')
-        try:
-            static_map = rospy.ServiceProxy('/static_map', GetMap)
-            resp1 = static_map()
-            # print(list(resp1.map.data))
-            return resp1.map
-        except rospy.ServiceException as e:
-            # print("Service call failed: %s"%e)
-            pass
-
     def to_grid(self, px, py, origin_, resolution):
         offsetx = (1/resolution)*(px - origin_[1])
         offsety = (1/resolution)*(py - origin_[0])
         return (int(offsetx), int(offsety))
-        
         
     def to_world(self, gx, gy, origin, resolution):
         offsetx = (resolution)*gx + origin[1]
@@ -158,11 +147,9 @@ class map_navigation():
         self.old_grid.info.resolution = self.res
         self.old_grid.info.origin.position.x = self.to_world(0, 0, self.origin_, self.res)[0]
         self.old_grid.info.origin.position.y = self.to_world(0, 0, self.origin_, self.res)[1]
-
         publish_grid = [int(sum(x)/len(past_grids)) for x in zip(*past_grids)]
         publish_grid = [x if x >= 0 else -1 for x in publish_grid]
         self.old_grid.data = publish_grid
-        # print(publish_grid)
         self.occ_pub.publish(self.old_grid)
 
 
@@ -170,9 +157,8 @@ class map_navigation():
         r = rospy.Rate(1)
         while not self.grid:
             r.sleep()
-        #size = (self.size_x*self.res, self.size_y*self.res)
         
-        print("size_x={size_x}, size_y={size_y}, grid size={grid_size}, origin_={pos}".format(size_x=self.size_x, size_y=self.size_y, grid_size=np.array(self.grid).size, pos=self.origin_))
+        print("Frontier mapping: size_x={size_x}, size_y={size_y}, grid size={grid_size}, origin_={pos}".format(size_x=self.size_x, size_y=self.size_y, grid_size=np.array(self.grid).size, pos=self.origin_))
         past_grids = []
         print(self.pos.x, self.pos.y, self.pos.theta)
         while not rospy.is_shutdown():
@@ -208,7 +194,7 @@ if __name__ == '__main__':
     try:
 
         rospy.loginfo("You have reached the destination")
-        thing = map_navigation()
+        thing = frontier_mapping()
         thing.run()
         rospy.spin()
 

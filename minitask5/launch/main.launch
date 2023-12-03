@@ -20,6 +20,7 @@
   <!-- <node name="search" pkg="minitask5" type="search.py" output="screen"/> -->
   <!-- <node name="localisation" pkg="minitask5" type="localisation.py" output="screen"/> -->
   <node name="mapping" pkg="minitask5" type="mapping.py" output="screen"/>
+  <node name="frontier_mapping" pkg="minitask5" type="frontier_mapping.py" output="screen"/>
 
   <!-- Navigation -->
   <!-- <include file="$(find minitask5)/launch/minitask5_navigation.launch"> -->
