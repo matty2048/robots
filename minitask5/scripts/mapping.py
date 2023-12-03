@@ -1,9 +1,9 @@
 import rospy
 from math import radians, degrees
 from actionlib_msgs.msg import *
-from geometry_msgs.msg import Quaternion
+from geometry_msgs.msg import Quaternion, PoseWithCovarianceStamped, PoseWithCovariance, Pose
 from nav_msgs.msg import Odometry, OccupancyGrid, MapMetaData
-from nav_msgs.srv import GetMap
+from nav_msgs.srv import GetMap, SetMap
 from sensor_msgs.msg import LaserScan
 from minitask5.msg import object_data
 import tf
@@ -26,14 +26,16 @@ class map_navigation():
         self.threshold = threshold
         self.old_grid = OccupancyGrid()
         self.objects_found = []
+        self.odom = None
         try:
             current_map = self.get_map_client()
             self.size_x = current_map.info.width
             self.size_y = current_map.info.height
             self.res = current_map.info.resolution
             self.origin_ = (current_map.info.origin.position.x, current_map.info.origin.position.y)
-            new_map = self.adjust_map(int(0/self.res), int(-0.3/self.res), self.size_x, list(current_map.data))
+            new_map = self.adjust_map(int(0/self.res), int(0/self.res), self.size_x, list(current_map.data))
             self.grid = new_map
+
         except:
             print("Failed to retrieve map")
             self.size_x = 384
@@ -57,7 +59,8 @@ class map_navigation():
         (roll, pitch, yaw) = tf.transformations.euler_from_quaternion(quarternion) # type: ignore
         self.pos.theta = yaw
         self.pos.x = msg.pose.pose.position.x
-        self.pos.y = msg.pose.pose.position.y
+        self.pos.y = msg.pose.pose.position.y 
+        self.odom = msg
     
     def get_map_client(self):
         rospy.wait_for_service('/static_map')
@@ -77,7 +80,7 @@ class map_navigation():
         return new_map.flatten().tolist()
     
     def to_grid(self, px, py, origin_, resolution):
-        offsetx = (1/resolution)*(px - origin_[1])
+        offsetx = (1/resolution)*(px - origin_[1] + 0.3)
         offsety = (1/resolution)*(py - origin_[0])
         return (int(offsetx), int(offsety))
         
@@ -175,7 +178,6 @@ class map_navigation():
         r = rospy.Rate(1)
         while not self.grid:
             r.sleep()
-        #size = (self.size_x*self.res, self.size_y*self.res)
         
         print("size_x={size_x}, size_y={size_y}, grid size={grid_size}, origin_={pos}".format(size_x=self.size_x, size_y=self.size_y, grid_size=np.array(self.grid).size, pos=self.origin_))
         past_grids = []
@@ -193,9 +195,6 @@ class map_navigation():
                 for j in range(len(gridpoints)-1):
                     temp = (gridpoints[j][1], gridpoints[j][0])
                     self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 0
-
-                # temp = (gridpoints[-3][1], gridpoints[-3][0])
-                # self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 100
                 temp = (gridpoints[-2][1], gridpoints[-2][0])
                 self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 100
                 temp = (gridpoints[-1][1], gridpoints[-1][0])
@@ -203,7 +202,6 @@ class map_navigation():
             self.place_object_at(object_data(rough_size = 0.5))
             past_grids.append(self.grid)
             self.pub_occ_grid(past_grids)
-            # print(len(past_grids))
             if len(past_grids) >= 5:
                 past_grids.pop(0)
             r.sleep()

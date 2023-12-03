@@ -43,9 +43,8 @@
 
   <!-- AMCL -->
   <include file="$(find turtlebot3_navigation)/launch/amcl.launch">
-  <!-- CHANGE TO ARGUMENTS LATER -->
-    <arg name="initial_pose_x" value="-1.238"/>
-    <arg name="initial_pose_y" value="4.207"/>
+    <arg name="initial_pose_x" value="-1.29"/>
+    <arg name="initial_pose_y" value="4.20"/>
     <arg name="initial_pose_a" value="0.0"/>
   </include>
 
@@ -55,8 +54,8 @@
     <arg name="move_forward_only" value="$(arg move_forward_only)"/>
   </include>
 
-  <group if="$(arg open_rviz)"> 
+  <!-- <group if="$(arg open_rviz)"> 
     <node pkg="rviz" type="rviz" name="rviz" required="true"
           args="-d $(find turtlebot3_navigation)/rviz/turtlebot3_navigation.rviz"/>
-  </group>
+  </group> -->
 </launch>
