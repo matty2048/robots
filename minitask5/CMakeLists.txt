@@ -43,7 +43,7 @@ catkin_install_python(PROGRAMS
   scripts/frontier_finder.py
   scripts/image_proc.py
   scripts/object_avoid.py
-  scripts/search.py
+  scripts/move_to.py
   scripts/localisation.py
   scripts/mapping.py
   scripts/frontier_mapping.py

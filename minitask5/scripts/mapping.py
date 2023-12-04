@@ -205,6 +205,9 @@ class map_navigation():
             self.grid = self.pub_occ_grid(past_grids)
             if len(past_grids) >= 10:
                 past_grids.pop(0)
+                past_grids.pop(0)
+                past_grids.pop(0)
+                past_grids.pop(0)
             r.sleep()
 
     
