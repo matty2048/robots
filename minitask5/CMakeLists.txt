@@ -1,10 +1,18 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(minitask5)
-find_package(catkin REQUIRED COMPONENTS rospy std_msgs geometry_msgs)
+find_package(catkin REQUIRED COMPONENTS 
+   rospy
+   std_msgs
+   geometry_msgs
+   message_generation
+)
 
 add_message_files(
- FILES
- controller.msg
+  FILES
+  controller.msg
+  image_proc.msg
+  object_data.msg
+  frontiers.msg
 )
 
 generate_messages(
@@ -13,18 +21,9 @@ generate_messages(
   geometry_msgs
 )
 
-find_package(catkin REQUIRED COMPONENTS 
-   rospy
-   std_msgs
-   geometry_msgs
-   message_generation
-)
-
-
 catkin_package(
  LIBRARIES minitask5
  CATKIN_DEPENDS rospy std_msgs geometry_msgs message_runtime
- DEPENDS system_lib
 )
 
 # Potentially need to move
@@ -41,11 +40,12 @@ include_directories(
 
 catkin_install_python(PROGRAMS
   scripts/main.py
-  scripts/goal_finder.py
+  scripts/frontier_finder.py
   scripts/image_proc.py
   scripts/object_avoid.py
   scripts/search.py
   scripts/localisation.py
   scripts/mapping.py
+  scripts/frontier_mapping.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )

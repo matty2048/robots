@@ -13,12 +13,12 @@ import cv2, cv_bridge
 import queue
 import tf
 from struct import * 
-
 class Position:
     def __init__(self,x,y,theta):
         self.x : float = x 
         self.y : float = y
         self.theta : float = theta
+
 
 class Point:
     def __init__(self, x, y, z, rgb) -> None:
@@ -113,6 +113,7 @@ class Camera:
         r = rospy.Rate(self.SLEEP_RATE)
         r.sleep()
         while not rospy.is_shutdown():
+
             if not (self.depth_ready and self.img_ready):
                 r.sleep()
                 continue
