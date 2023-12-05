@@ -25,9 +25,10 @@ class move_to:
         # Parameter initialisation
         self.param_max_green_boxes = rospy.get_param('/main/max_green_boxes')
         self.param_max_red_hydrants = rospy.get_param('/main/max_red_hydrants')
-        self.frontiers = []
+        
         # Variable initialisation
         self.pos = Position(0, 0, 0)
+        self.frontiers = [Point(x= -1.5, y = -1)]
 
         # Turn condition variable initialisation
         # self.turn = 0
@@ -43,7 +44,7 @@ class move_to:
         rospy.init_node('move_to.py', anonymous=False)
 
     def callback_frontiers(self):
-        pass
+        self.frontiers = [Point(x= -1.5, y = -1)]
 
     def callback_laser(self, msg):
         self.ranges = msg.ranges
@@ -67,7 +68,7 @@ class move_to:
         #         self.turn = 0
         #         self.reverse = 0
 
-    def moveToGoal(self,xGoal,yGoal):
+    def moveToGoal(self,xGoal,yGoal,orientation = 1.0):
 
         #define a client for to send goal requests to the move_base server through a SimpleActionClient
         ac = actionlib.SimpleActionClient("move_base", MoveBaseAction)
@@ -89,7 +90,7 @@ class move_to:
         goal.target_pose.pose.orientation.x = 0.0
         goal.target_pose.pose.orientation.y = 0.0
         goal.target_pose.pose.orientation.z = 0.0
-        goal.target_pose.pose.orientation.w = 1.0
+        goal.target_pose.pose.orientation.w = orientation
 
         rospy.loginfo("Sending goal location ...")
         ac.send_goal(goal)
@@ -111,16 +112,32 @@ class move_to:
         self.pos.x = msg.pose.pose.position.x
         self.pos.y = msg.pose.pose.position.y
 
+    def decide_goal(self):
+        goal = self.frontiers[0]
+        return goal
+
     def run(self):
         r = rospy.Rate(self.SLEEP_RATE)
         # Whilst not shutdown OR Found all objects
+        
+        t = rospy.Time.now().to_sec()
+        vel_pub = rospy.Publisher('cmd_vel', Twist, queue_size=10)
+        num_secs = 10
+        while rospy.Time.now().to_sec() - t < rospy.Duration(num_secs).to_sec():
+
+            vel_msg = Twist()
+            vel_msg.angular.z = 0.314
+            vel_pub.publish( vel_msg )
+            r.sleep()
+
         while not rospy.is_shutdown():
-            if self.reverse or self.turn:
-                r.sleep()
-                continue
-            else:
-                pass
-                # self.moveToGoal(0, -1)
+            # goal: Point
+            # goal = self.decide_goal()
+            # print(goal)
+            # self.moveToGoal(goal.x, goal.y)
+
+            # Move to main controller set up 
+            # Check for certainty of position with covariance to activate move_base
             r.sleep()
 
 if __name__ == '__main__':

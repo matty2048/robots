@@ -5,7 +5,7 @@ from geometry_msgs.msg import Quaternion, PoseWithCovarianceStamped, PoseWithCov
 from nav_msgs.msg import Odometry, OccupancyGrid, MapMetaData
 from nav_msgs.srv import GetMap, SetMap
 from sensor_msgs.msg import LaserScan
-from minitask5.msg import object_data
+from minitask5.msg import object_data, image_proc
 import tf
 import numpy as np
 import math
@@ -17,15 +17,11 @@ class Position:
         self.theta : float = theta
 
 class map_navigation():
-    # List of blue tiles
-    TEMP_OBJECT_LIST = [
-        object_data(blue= 255, x_location= -0.329, y_location= 0.0587, rough_size= 0.70),
-        object_data(blue= 255, x_location= 0.269, y_location= -0.6706, rough_size= 0.70),
-        object_data(blue= 255, x_location= 0.316, y_location= 0.6272, rough_size= 0.70),
-        object_data(blue= 255, x_location= 0.9469, y_location= -3.15, rough_size= 0.70),
-    ]
 
     def __init__(self, res = 0.05, origin = (-10, -10), threshold = 0.65):
+        self.old_obj_loc: object_data = []
+        self.new_obj_loc: object_data = []
+        self.obj_loc_changed = True
         self.pos = Position(0,0,0)
         self.ranges = [0]*360
         self.range_min = 0.118
@@ -34,6 +30,7 @@ class map_navigation():
         self.old_grid = OccupancyGrid()
         self.objects_found = []
         self.corr_x = 0.3
+        self.past_grids = []
         try:
             current_map = self.get_map_client()
             self.size_x = current_map.info.width
@@ -52,10 +49,18 @@ class map_navigation():
             self.res = res
 
         self.occ_pub = rospy.Publisher('/map', OccupancyGrid, queue_size=10)
-        rospy.Subscriber('scan', LaserScan, self.callback_laser)
-        rospy.Subscriber('odom', Odometry, self.callback_odom)
+        rospy.Subscriber('/scan', LaserScan, self.callback_laser)
+        rospy.Subscriber('/odom', Odometry, self.callback_odom)
+        rospy.Subscriber('/image_proc', image_proc, self.callback_object)
         rospy.init_node('map_navigation', anonymous=True)
     
+    
+    def callback_object(self, msg: image_proc):
+        # if self.new_obj_loc== msg.object_data: return
+        self.old_obj_loc = self.new_obj_loc
+        self.new_obj_loc = msg.object_data
+        # self.obj_loc_changed = True
+
     def callback_laser(self, msg):
         self.ranges = msg.ranges
         self.range_min = msg.range_min
@@ -159,18 +164,26 @@ class map_navigation():
         points = [x if (x < self.range_max and x > self.range_min) else 0 for x in points]
         return points
 
-    def place_all_blue_tiles(self):
-        # CHANGE IN FULL IMPLEMENTATION
-        for tile in self.TEMP_OBJECT_LIST:
-            self.place_object_at(tile)
+    def renew_objects(self):
+        # if not self.obj_loc_changed: return
+        self.change_all_objects_to(self.new_obj_loc, 0)
+        self.change_all_objects_to(self.new_obj_loc, 100)
+        # self.obj_loc_changed = False
 
-    def place_object_at(self, object_found: object_data):
+    def change_all_objects_to(self, obj_list, probability):
+        # CHANGE IN FULL IMPLEMENTATION
+        for i in range(len(self.past_grids)):
+            for tile in obj_list:
+                self.past_grids[i] = self.map_object_value_to(tile, self.past_grids[i],probability)
+                # self.grid = self.map_object_value_to(tile, self.grid ,probability)
+
+    def map_object_value_to(self, object_found: object_data, grid, probability=100):
         size_r = int(object_found.rough_size  / 2*(1/self.res))
         centre = self.to_grid(object_found.y_location, object_found.x_location + self.corr_x, self.origin_, self.res)
         for i in range(-size_r, size_r):
             for j in range(-size_r, size_r):
-                self.grid[self.to_index(centre[0] + i, centre[1] + j, self.size_x)] = 100
-        return
+                grid[self.to_index(centre[0] + i, centre[1] + j, self.size_x)] = probability
+        return grid
 
     def pub_occ_grid(self, past_grids):
         self.old_grid.data = self.grid
@@ -185,6 +198,25 @@ class map_navigation():
         self.occ_pub.publish(self.old_grid)
         return publish_grid
 
+    def map_all_lines(self):
+        points = self.filter_min_max(self.ranges)
+        cur_pos = self.to_grid(self.pos.x, self.pos.y, self.origin_, self.res)
+        cur_angle = self.pos.theta
+        for i in range(len(points)):
+            if points[i] == 0: continue
+            if i % 2 == 0: continue
+            if (abs(points[i] - points[(i + 1) % 360]) > 0.15 ) and (abs(points[i] - points[(i - 1) %360]) > 0.15 ): continue
+            rads = (radians(i) + cur_angle - math.pi/2) 
+            endpos = self.to_grid(self.pos.x + (points[i]) * -math.sin(rads), self.pos.y + (points[i]) * math.cos(rads), self.origin_, self.res)
+            gridpoints = self.get_line(cur_pos, endpos)
+            for j in range(len(gridpoints)-1):
+                temp = (gridpoints[j][1], gridpoints[j][0])
+                self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 0
+            temp = (gridpoints[-2][1], gridpoints[-2][0])
+            self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 100
+            temp = (gridpoints[-1][1], gridpoints[-1][0])
+            self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 100
+        return
 
     def run(self):
         r = rospy.Rate(1)
@@ -192,31 +224,15 @@ class map_navigation():
             r.sleep()
         
         print("size_x={size_x}, size_y={size_y}, grid size={grid_size}, origin_={pos}".format(size_x=self.size_x, size_y=self.size_y, grid_size=np.array(self.grid).size, pos=self.origin_))
-        past_grids = []
+        self.past_grids = []
         print(self.pos.x, self.pos.y, self.pos.theta)
         while not rospy.is_shutdown():
-            past_grids.append(self.grid)
-            points = self.filter_min_max(self.ranges)
-            cur_pos = self.to_grid(self.pos.x, self.pos.y, self.origin_, self.res)
-            cur_angle = self.pos.theta
-            for i in range(len(points)):
-                if points[i] == 0: continue
-                if i % 2 == 0: continue
-                if (abs(points[i] - points[(i + 1) % 360]) > 0.15 ) and (abs(points[i] - points[(i - 1) %360]) > 0.15 ): continue
-                rads = (radians(i) + cur_angle - math.pi/2) 
-                endpos = self.to_grid(self.pos.x + (points[i]) * -math.sin(rads), self.pos.y + (points[i]) * math.cos(rads), self.origin_, self.res)
-                gridpoints = self.get_line(cur_pos, endpos)
-                for j in range(len(gridpoints)-1):
-                    temp = (gridpoints[j][1], gridpoints[j][0])
-                    self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 0
-                temp = (gridpoints[-2][1], gridpoints[-2][0])
-                self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 100
-                temp = (gridpoints[-1][1], gridpoints[-1][0])
-                self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 100
-            self.place_all_blue_tiles()
-            self.grid = self.pub_occ_grid(past_grids)
-            if len(past_grids) >= 10:
-                past_grids = past_grids[5:]
+            self.past_grids.append(self.grid)
+            self.map_all_lines()
+            self.renew_objects()
+            self.grid = self.pub_occ_grid(self.past_grids)
+            if len(self.past_grids) >= 10:
+                self.past_grids = self.past_grids[1:]
             r.sleep()
 
     
