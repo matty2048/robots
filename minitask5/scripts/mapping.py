@@ -17,6 +17,13 @@ class Position:
         self.theta : float = theta
 
 class map_navigation():
+    # List of blue tiles
+    TEMP_OBJECT_LIST = [
+        object_data(blue= 255, x_location= -0.329, y_location= 0.0587, rough_size= 0.70),
+        object_data(blue= 255, x_location= 0.269, y_location= -0.6706, rough_size= 0.70),
+        object_data(blue= 255, x_location= 0.316, y_location= 0.6272, rough_size= 0.70),
+        object_data(blue= 255, x_location= 0.9469, y_location= -3.15, rough_size= 0.70),
+    ]
 
     def __init__(self, res = 0.05, origin = (-10, -10), threshold = 0.65):
         self.pos = Position(0,0,0)
@@ -152,9 +159,14 @@ class map_navigation():
         points = [x if (x < self.range_max and x > self.range_min) else 0 for x in points]
         return points
 
+    def place_all_blue_tiles(self):
+        # CHANGE IN FULL IMPLEMENTATION
+        for tile in self.TEMP_OBJECT_LIST:
+            self.place_object_at(tile)
+
     def place_object_at(self, object_found: object_data):
         size_r = int(object_found.rough_size  / 2*(1/self.res))
-        centre = self.to_grid(object_found.x_location, object_found.y_location, self.origin_, self.res)
+        centre = self.to_grid(object_found.y_location, object_found.x_location + self.corr_x, self.origin_, self.res)
         for i in range(-size_r, size_r):
             for j in range(-size_r, size_r):
                 self.grid[self.to_index(centre[0] + i, centre[1] + j, self.size_x)] = 100
@@ -201,13 +213,10 @@ class map_navigation():
                 self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 100
                 temp = (gridpoints[-1][1], gridpoints[-1][0])
                 self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 100
-            self.place_object_at(object_data(rough_size = 0.5))
+            self.place_all_blue_tiles()
             self.grid = self.pub_occ_grid(past_grids)
             if len(past_grids) >= 10:
-                past_grids.pop(0)
-                past_grids.pop(0)
-                past_grids.pop(0)
-                past_grids.pop(0)
+                past_grids = past_grids[5:]
             r.sleep()
 
     

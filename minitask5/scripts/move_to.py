@@ -19,7 +19,7 @@ class Position:
         self.theta : float = theta
 
 class move_to:
-    SLEEP_RATE = 2
+    SLEEP_RATE = 5
 
     def __init__(self):
         # Parameter initialisation
@@ -30,8 +30,9 @@ class move_to:
         self.pos = Position(0, 0, 0)
 
         # Turn condition variable initialisation
-        self.turn = 0
+        # self.turn = 0
         self.reverse = 0
+        self.turn = 0
 
         # Publisher and Subcriber initialisation
         # rospy.Subscriber('/frontiers', frontiers, self.callback_frontiers)
@@ -46,15 +47,25 @@ class move_to:
 
     def callback_laser(self, msg):
         self.ranges = msg.ranges
-        front = msg.ranges[340:360] + msg.ranges[0:20]
+        front = msg.ranges[330:360] + msg.ranges[0:30]
+        front_turn = msg.ranges[320:360] + msg.ranges[0:40]
         back = msg.ranges[160:200]
-        if min(back) > 0.5 and min(front) < 0.4:
-            self.reverse = 1
-        elif min(front) < 0.5:
-            self.turn = 1
-        else:
-            self.turn = 0
-            self.reverse = 0
+        # if currently turning then keep turning until
+        # if self.turn and min(front_turn) < 0.4:
+        #     self.turn = 1
+        # # elif reversing keep reversing until
+        # elif self.reverse and min(back) < 0.5:
+        #     self.reverse = 1
+        # else: 
+        #     if min(back) > 0.5 and min(front) < 0.2:
+        #         self.reverse = 1
+        #         self.turn = 0
+        #     elif min(front) < 0.2:
+        #         self.turn = 1
+        #         self.reverse = 0
+        #     else:
+        #         self.turn = 0
+        #         self.reverse = 0
 
     def moveToGoal(self,xGoal,yGoal):
 
@@ -104,7 +115,12 @@ class move_to:
         r = rospy.Rate(self.SLEEP_RATE)
         # Whilst not shutdown OR Found all objects
         while not rospy.is_shutdown():
-            # self.moveToGoal(0, -1)
+            if self.reverse or self.turn:
+                r.sleep()
+                continue
+            else:
+                pass
+                # self.moveToGoal(0, -1)
             r.sleep()
 
 if __name__ == '__main__':
