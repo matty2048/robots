@@ -10,9 +10,12 @@ import pylab as plt
 from PIL import Image as im
 import random
 import cv2, cv_bridge
+from minitask5.msg import image_proc
+from minitask5.msg import object_data
 import queue
 import tf
 from struct import * 
+import math
 class Position:
     def __init__(self,x,y,theta):
         self.x : float = x 
@@ -34,7 +37,8 @@ class Camera:
         #cv2.namedWindow("original", 1)
         self.image_sub = rospy.Subscriber('camera/rgb/image_raw', Image, self.image_callback)
         self.depth_sub = rospy.Subscriber('camera/depth/points', PointCloud2, self.depth_callback)
-
+        rospy.Subscriber('odom', Odometry, self.callback_odom)
+        self.obj_pub = rospy.Publisher('objects', image_proc)
         self.image_resized = []
         self.blueMask = []
         self.redMask = []
@@ -45,6 +49,7 @@ class Camera:
         self.depth_points = []
         self.depth_ready = False
         self.img_ready = False
+        self.pos = Position(0,0,0)
         cv2.startWindowThread()
     
     def image_callback(self, msg):
@@ -57,7 +62,7 @@ class Camera:
         blueLowerValues = np.array([90, 160, 160])
         blueUpperValues = np.array([128, 255, 255])
         self.blueMask = cv2.inRange(hsv, blueLowerValues, blueUpperValues)
-        
+        cv2.imshow("blue mask", self.blueMask)
         greenLowerValues = np.array([40, 200, 20])
         greenUpperValues = np.array([70, 255, 255])
         self.greenMask = cv2.inRange(hsv, greenLowerValues, greenUpperValues)
@@ -71,12 +76,11 @@ class Camera:
         redMask2 = cv2.inRange(hsl, redLowerValues2, redUpperValues2)
         self.redMask = redMask1  + redMask2 
 
-        self.image = cv2.bitwise_and(self.image, self.image, mask = self.greenMask)
-        # open the image with a kernel
+        #self.image = cv2.bitwise_and(self.image, self.image, mask = self.greenMask)
         
         self.width = w
         self.height = h
-        cv2.imshow("image", self.image)
+        #cv2.imshow("image", self.image)
         self.img_ready = True
     
     def xytoidx(self, x, y):
@@ -102,12 +106,90 @@ class Camera:
            #print(x[4])
            i = i + 1
         self.depth_points = pointcloud
+        #get bounding boxes of blue
+        analysis = cv2.connectedComponentsWithStats(self.blueMask, 
+                                            4, 
+                                            cv2.CV_32S)
+        (totalLabels, label_ids, stats, centroid) = analysis
+        data = []
+        for i in range(totalLabels):
+            dat = object_data()
+            dat.blue = 255
+            centre = centroid[i]
+            centre_x = centre[0]
+            centre_y = centre[1]
+            centre_bot = pointcloud[self.to_idx(centre_x, centre_y, 1920)][0:2]
+            centre_rotated = (centre_bot[0] * math.cos(-self.pos.theta) - centre_bot[1] * math.sin(-self.pos.theta), 
+                              centre_bot[0] * math.sin(-self.pos.theta) + centre_bot[1] * math.cos(-self.pos.theta))
+            centre_world = (centre_rotated[0] + self.pos.x, centre_rotated[1] + self.pos.y)
+            dat.x_location = centre_world[0]
+            dat.y_location = centre_world[1]
+            data.append(dat)
+        self.obj_pub.publish(data)
+
+        # get red obj locations
+        analysis = cv2.connectedComponentsWithStats(self.redMask, 
+                                            4, 
+                                            cv2.CV_32S)
+        (totalLabels, label_ids, stats, centroid) = analysis
+        data = []
+        for i in range(totalLabels):
+            dat = object_data()
+            dat.red = 255
+            centre = centroid[i]
+            centre_x = centre[0]
+            centre_y = centre[1]
+            centre_bot = pointcloud[self.to_idx(centre_x, centre_y, 1920)][0:2]
+            centre_rotated = (centre_bot[0] * math.cos(-self.pos.theta) - centre_bot[1] * math.sin(-self.pos.theta), 
+                              centre_bot[0] * math.sin(-self.pos.theta) + centre_bot[1] * math.cos(-self.pos.theta))
+            centre_world = (centre_rotated[0] + self.pos.x, centre_rotated[1] + self.pos.y)
+            dat.x_location = centre_world[0]
+            dat.y_location = centre_world[1]
+            data.append(dat)
+        self.obj_pub.publish(data)
+
+        #get green obj locations
+        analysis = cv2.connectedComponentsWithStats(self.greenMask, 
+                                            4, 
+                                            cv2.CV_32S)
+        (totalLabels, label_ids, stats, centroid) = analysis
+        data = []
+        for i in range(totalLabels):
+            dat = object_data()
+            dat.green = 255
+            centre = centroid[i]
+            centre_x = centre[0]
+            centre_y = centre[1]
+            centre_bot = pointcloud[self.to_idx(centre_x, centre_y, 1920)][0:2]
+            centre_rotated = (centre_bot[0] * math.cos(-self.pos.theta) - centre_bot[1] * math.sin(-self.pos.theta), 
+                              centre_bot[0] * math.sin(-self.pos.theta) + centre_bot[1] * math.cos(-self.pos.theta))
+            centre_world = (centre_rotated[0] + self.pos.x, centre_rotated[1] + self.pos.y)
+            dat.x_location = centre_world[0]
+            dat.y_location = centre_world[1]
+            data.append(dat)
+        self.obj_pub.publish(data)
+
+        #mask_indices = np.transpose(np.where(self.blueMask != 0))
+        #print(mask_indices)
+        #for i,j in mask_indices:
+        #    depth_point = pointcloud[1920*j + i]
+        #    theta = -self.pos.theta
+            
+
         self.depth_ready = True
         
-
+    def to_idx(self, x, y, sizex):
+        return y*sizex + x
     def getBlueIdxs(self):
         return np.transpose(np.nonzero(self.blueMask))
-         
+
+    def callback_odom(self, msg):
+        quarternion = [msg.pose.pose.orientation.x,msg.pose.pose.orientation.y,msg.pose.pose.orientation.z, msg.pose.pose.orientation.w]
+        (roll, pitch, yaw) = tf.transformations.euler_from_quaternion(quarternion)
+        self.pos.theta = yaw
+        self.pos.x = msg.pose.pose.position.x
+        self.pos.y = msg.pose.pose.position.y
+
 
     def run(self):
         r = rospy.Rate(self.SLEEP_RATE)
