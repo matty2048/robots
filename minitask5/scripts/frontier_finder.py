@@ -4,6 +4,7 @@ from actionlib_msgs.msg import *
 from geometry_msgs.msg import Quaternion, PoseWithCovarianceStamped, PoseWithCovariance, Pose
 from nav_msgs.msg import Odometry, OccupancyGrid, MapMetaData
 from nav_msgs.srv import GetMap, SetMap
+from scripts.image_proc import Point
 from sensor_msgs.msg import LaserScan
 from minitask5.msg import frontiers
 import tf
@@ -77,9 +78,11 @@ class frontier_finder():
                             status = 255
                 self.frontier[i][j][0] = status
         self.front_points = self.connected_components()
-        self.frontier =  np.zeros((self.width, self.height,1), dtype=np.uint8)
-        cv2.imshow("img",self.frontier)
-        cv2.waitKey(1)
+        outputmsg = [] 
+        for point in self.front_points:
+            p = Point(point[0], point[1],0,0)
+            outputmsg.append(p)
+        self.pub_frontier.publish(outputmsg)
 
     def connected_components(self):
         analysis = cv2.connectedComponentsWithStats(self.frontier, 
