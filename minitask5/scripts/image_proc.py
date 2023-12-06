@@ -5,6 +5,7 @@ from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import PointCloud2
 from sensor_msgs.msg import LaserScan, Image
+from minitask5.msg import object_data, image_proc
 import numpy as np
 import pylab as plt
 from PIL import Image as im
@@ -37,8 +38,7 @@ class Camera:
         #cv2.namedWindow("original", 1)
         self.image_sub = rospy.Subscriber('camera/rgb/image_raw', Image, self.image_callback)
         self.depth_sub = rospy.Subscriber('camera/depth/points', PointCloud2, self.depth_callback)
-        rospy.Subscriber('odom', Odometry, self.callback_odom)
-        self.obj_pub = rospy.Publisher('objects', image_proc)
+        self.obj_pub = rospy.Publisher('/image_proc', image_proc, queue_size=10)
         self.image_resized = []
         self.blueMask = []
         self.redMask = []
@@ -202,7 +202,13 @@ class Camera:
 
     def run(self):
         r = rospy.Rate(self.SLEEP_RATE)
-        r.sleep()
+
+        TEMP_OBJECT_LIST = image_proc(object_data = [
+            object_data(blue= 255, x_location= -0.329, y_location= 0.0587, rough_size= 0.70),
+            object_data(blue= 255, x_location= 0.269, y_location= -0.6706, rough_size= 0.70),
+            object_data(blue= 255, x_location= 0.316, y_location= 0.6272, rough_size= 0.70),
+            object_data(blue= 255, x_location= 0.9469, y_location= -3.15, rough_size= 0.70),
+        ])
         while not rospy.is_shutdown():
 
             if not (self.depth_ready and self.img_ready):
@@ -211,6 +217,7 @@ class Camera:
             #indexes = self.getBlueIdxs()
             #if indexes.any():
             #    print(self.depth_points[self.xytoidx(indexes[0][1] * 4,indexes[0][0] * 4)][2])
+            self.obj_loc_pub.publish(TEMP_OBJECT_LIST)
             r.sleep()
         pass
 

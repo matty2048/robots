@@ -15,13 +15,13 @@
     <param name="max_red_hydrants"            value="2"/>
   </node>
   <!-- <node name="frontier_finder" pkg="minitask5" type="frontier_finder.py" output="screen"/> -->
-  <!-- <node name="image_processor" pkg="minitask5" type="image_proc.py" output="screen"/> -->
+  <node name="image_processor" pkg="minitask5" type="image_proc.py" output="screen"/>
   <!-- <node name="object_avoid" pkg="minitask5" type="object_avoid.py" output="screen"/> -->
   <node name="move_to" pkg="minitask5" type="move_to.py" output="screen">
     <param name="max_green_boxes"             value="2"/>
     <param name="max_red_hydrants"            value="2"/>
   </node>
-  <!-- <node name="localisation" pkg="minitask5" type="localisation.py" output="screen"/> -->
+  <!-- <node name="scan_obj" pkg="minitask5" type="scan_obj.py" output="screen"/> -->
   <node name="mapping" pkg="minitask5" type="mapping.py" output="screen"/>
   <node name="frontier_mapping" pkg="minitask5" type="frontier_mapping.py" output="screen"/>
 

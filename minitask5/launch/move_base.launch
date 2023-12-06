@@ -18,8 +18,13 @@
     <remap from="odom" to="$(arg odom_topic)"/>
     <param name="DWAPlannerROS/min_vel_x" value="0.0" if="$(arg move_forward_only)" />
 
-    <!-- Custom Parameter settings -->
+    <!-- Custom Parameter settings for Planner -->
     <param name="DWAPlannerROS/max_vel_x" value="0.2"/>
     <param name="DWAPlannerROS/min_vel_x" value="-0.15" if="$(eval arg('move_forward_only') == false)"/>
+    <param name="DWAPlannerROS/max_vel_theta" value="1.4"/>
+    <param name="DWAPlannerROS/min_vel_theta" value="0.5"/>
+    <param name="DWAPlannerROS/acc_lim_x" value="1.8"/>
+    <param name="DWAPlannerROS/acc_lim_theta" value="1.8"/>
+    
   </node>
 </launch>
