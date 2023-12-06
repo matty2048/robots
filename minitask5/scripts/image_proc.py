@@ -114,18 +114,21 @@ class Camera:
                                             cv2.CV_32S)
         (totalLabels, label_ids, stats, centroid) = analysis
         data = []
-        for i in range(totalLabels):
+        for i in range(1, totalLabels):
             dat = object_data()
             dat.blue = 255
             centre = centroid[i]
-            centre_x = centre[0]
-            centre_y = centre[1]
+            centre_x = int(centre[0] * 4)
+            centre_y = int(centre[1] * 4)
             centre_bot = pointcloud[self.to_idx(centre_x, centre_y, 1920)][0:2]
+            if math.isnan(centre_bot[0]) or math.isnan(centre_bot[1]): 
+                continue
             centre_rotated = (centre_bot[0] * math.cos(-self.pos.theta) - centre_bot[1] * math.sin(-self.pos.theta), 
                               centre_bot[0] * math.sin(-self.pos.theta) + centre_bot[1] * math.cos(-self.pos.theta))
             centre_world = (centre_rotated[0] + self.pos.x, centre_rotated[1] + self.pos.y)
             dat.x_location = centre_world[0]
             dat.y_location = centre_world[1]
+            print(dat.x_location, dat.y_location)
             data.append(dat)
         self.obj_pub.publish(data)
 
@@ -135,13 +138,15 @@ class Camera:
                                             cv2.CV_32S)
         (totalLabels, label_ids, stats, centroid) = analysis
         data = []
-        for i in range(totalLabels):
+        for i in range(1,totalLabels):
             dat = object_data()
             dat.red = 255
             centre = centroid[i]
-            centre_x = centre[0]
-            centre_y = centre[1]
+            centre_x = int(centre[0] * 4)
+            centre_y = int(centre[1] * 4)
             centre_bot = pointcloud[self.to_idx(centre_x, centre_y, 1920)][0:2]
+            if math.isnan(centre_bot[0]) or math.isnan(centre_bot[1]): 
+                continue
             centre_rotated = (centre_bot[0] * math.cos(-self.pos.theta) - centre_bot[1] * math.sin(-self.pos.theta), 
                               centre_bot[0] * math.sin(-self.pos.theta) + centre_bot[1] * math.cos(-self.pos.theta))
             centre_world = (centre_rotated[0] + self.pos.x, centre_rotated[1] + self.pos.y)
@@ -156,13 +161,15 @@ class Camera:
                                             cv2.CV_32S)
         (totalLabels, label_ids, stats, centroid) = analysis
         data = []
-        for i in range(totalLabels):
+        for i in range(1,totalLabels):
             dat = object_data()
             dat.green = 255
             centre = centroid[i]
-            centre_x = centre[0]
-            centre_y = centre[1]
+            centre_x = int(centre[0] * 4)
+            centre_y = int(centre[1] * 4)
             centre_bot = pointcloud[self.to_idx(centre_x, centre_y, 1920)][0:2]
+            if math.isnan(centre_bot[0]) or math.isnan(centre_bot[1]): 
+                continue
             centre_rotated = (centre_bot[0] * math.cos(-self.pos.theta) - centre_bot[1] * math.sin(-self.pos.theta), 
                               centre_bot[0] * math.sin(-self.pos.theta) + centre_bot[1] * math.cos(-self.pos.theta))
             centre_world = (centre_rotated[0] + self.pos.x, centre_rotated[1] + self.pos.y)
