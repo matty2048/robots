@@ -87,10 +87,12 @@ class Camera:
         return 1920*y + x
     
     def depth_callback(self, msg):      
-        for f in msg.fields:
-            print(f.name, f.offset, f.datatype, f.count)
         #4147200
         #2073600
+        #cache the current masks or data will be wacky
+        bluemask = self.blueMask
+        redmask = self.redMask
+        greenmask = self.greenMask
         print(msg.point_step)
         float_iter = iter_unpack("8f", msg.data)
         #l = len(list(float_iter))
@@ -107,7 +109,7 @@ class Camera:
            i = i + 1
         self.depth_points = pointcloud
         #get bounding boxes of blue
-        analysis = cv2.connectedComponentsWithStats(self.blueMask, 
+        analysis = cv2.connectedComponentsWithStats(bluemask, 
                                             4, 
                                             cv2.CV_32S)
         (totalLabels, label_ids, stats, centroid) = analysis
@@ -128,7 +130,7 @@ class Camera:
         self.obj_pub.publish(data)
 
         # get red obj locations
-        analysis = cv2.connectedComponentsWithStats(self.redMask, 
+        analysis = cv2.connectedComponentsWithStats(redmask, 
                                             4, 
                                             cv2.CV_32S)
         (totalLabels, label_ids, stats, centroid) = analysis
@@ -149,7 +151,7 @@ class Camera:
         self.obj_pub.publish(data)
 
         #get green obj locations
-        analysis = cv2.connectedComponentsWithStats(self.greenMask, 
+        analysis = cv2.connectedComponentsWithStats(greenmask, 
                                             4, 
                                             cv2.CV_32S)
         (totalLabels, label_ids, stats, centroid) = analysis
