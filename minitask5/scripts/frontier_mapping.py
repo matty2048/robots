@@ -84,7 +84,7 @@ class frontier_mapping():
         return (offsetx, offsety)
 
     def to_index(self, gx, gy, size_x):
-        return gx * size_x + gy
+        return gy * size_x + gx
 
     def get_line(self, start, end):
         """Bresenham's Line Algorithm
@@ -189,11 +189,11 @@ class frontier_mapping():
                 endpos = self.to_grid(self.pos.x + (points[i]) * -math.sin(rads), self.pos.y + (points[i]) * math.cos(rads), self.origin_, self.res)
                 gridpoints = self.get_line(cur_pos, endpos)
                 for j in range(len(gridpoints)-1):
-                    temp = (gridpoints[j][1], gridpoints[j][0])
+                    temp = (gridpoints[j][0], gridpoints[j][1])
                     self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 0
-                temp = (gridpoints[-2][1], gridpoints[-2][0])
+                temp = (gridpoints[-2][0], gridpoints[-2][1])
                 self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 100
-                temp = (gridpoints[-1][1], gridpoints[-1][0])
+                temp = (gridpoints[-1][0], gridpoints[-1][1])
                 self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 100
             self.place_object_at(object_data(rough_size = 0.5))
             self.grid = self.pub_occ_grid(past_grids)

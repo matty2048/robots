@@ -3,7 +3,7 @@
   <arg name="model" default="$(env TURTLEBOT3_MODEL)" doc="model type [burger, waffle, waffle_pi]"/>
   <arg name="cmd_vel_topic" default="/cmd_vel" />
   <arg name="odom_topic" default="odom" />
-  <arg name="move_forward_only" default="false"/>
+  <arg name="move_forward_only" default="true"/>
 
   <!-- move_base -->
   <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
@@ -21,7 +21,7 @@
     <!-- Custom Parameter settings for Planner -->
     <param name="DWAPlannerROS/max_vel_x" value="0.2"/>
     <param name="DWAPlannerROS/min_vel_x" value="-0.15" if="$(eval arg('move_forward_only') == false)"/>
-    <param name="DWAPlannerROS/max_vel_theta" value="1.4"/>
+    <param name="DWAPlannerROS/max_vel_theta" value="2.6"/>
     <param name="DWAPlannerROS/min_vel_theta" value="0.5"/>
     <param name="DWAPlannerROS/acc_lim_x" value="1.8"/>
     <param name="DWAPlannerROS/acc_lim_theta" value="1.8"/>

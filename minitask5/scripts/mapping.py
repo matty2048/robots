@@ -102,7 +102,7 @@ class map_navigation():
         return (offsetx, offsety)
 
     def to_index(self, gx, gy, size_x):
-        return gx * size_x + gy
+        return gy * size_x + gx
 
     def get_line(self, start, end):
         """Bresenham's Line Algorithm
@@ -200,21 +200,22 @@ class map_navigation():
 
     def map_all_lines(self):
         points = self.filter_min_max(self.ranges)
-        cur_pos = self.to_grid(self.pos.x, self.pos.y, self.origin_, self.res)
+        cur_pos = (self.pos.x, self.pos.y)
+        cur_pos_grid = self.to_grid(self.pos.x, self.pos.y, self.origin_, self.res)
         cur_angle = self.pos.theta
         for i in range(len(points)):
             if points[i] == 0: continue
             if i % 2 == 0: continue
             if (abs(points[i] - points[(i + 1) % 360]) > 0.15 ) and (abs(points[i] - points[(i - 1) %360]) > 0.15 ): continue
             rads = (radians(i) + cur_angle - math.pi/2) 
-            endpos = self.to_grid(self.pos.x + (points[i]) * -math.sin(rads), self.pos.y + (points[i]) * math.cos(rads), self.origin_, self.res)
-            gridpoints = self.get_line(cur_pos, endpos)
+            endpos = self.to_grid(cur_pos[0] + (points[i]) * -math.sin(rads), cur_pos[1] + (points[i]) * math.cos(rads), self.origin_, self.res)
+            gridpoints = self.get_line(cur_pos_grid, endpos)
             for j in range(len(gridpoints)-1):
-                temp = (gridpoints[j][1], gridpoints[j][0])
+                temp = (gridpoints[j][0], gridpoints[j][1])
                 self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 0
-            temp = (gridpoints[-2][1], gridpoints[-2][0])
+            temp = (gridpoints[-2][0], gridpoints[-2][1])
             self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 100
-            temp = (gridpoints[-1][1], gridpoints[-1][0])
+            temp = (gridpoints[-1][0], gridpoints[-1][1])
             self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 100
         return
 
