@@ -1,10 +1,9 @@
 import rospy
 from math import radians, degrees
 from actionlib_msgs.msg import *
-from geometry_msgs.msg import Quaternion, PoseWithCovarianceStamped, PoseWithCovariance, Pose
+from geometry_msgs.msg import Quaternion, PoseWithCovarianceStamped, PoseWithCovariance, Pose, Point
 from nav_msgs.msg import Odometry, OccupancyGrid, MapMetaData
 from nav_msgs.srv import GetMap, SetMap
-from scripts.image_proc import Point
 from sensor_msgs.msg import LaserScan
 from minitask5.msg import frontiers
 import tf
@@ -16,7 +15,7 @@ import matplotlib.pyplot as plt
 
 class Position:
     def __init__(self,x,y,theta):
-        self.x : float = x 
+        self.x : float = x
         self.y : float = y
         self.theta : float = theta
 
@@ -30,6 +29,7 @@ class frontier_finder():
         self.height = 194
         self.origin = Pose()
         self.frontier = []
+        self.corr_x = 0.3
         self.pub_frontier = rospy.Publisher('/frontiers', frontiers, queue_size=10)
         self.sub_occupancy = rospy.Subscriber('/map_frontier', OccupancyGrid, self.callback_occ)
         rospy.init_node('frontier_finder', anonymous=True)
@@ -44,9 +44,10 @@ class frontier_finder():
         self.height = msg.info.height
         self.origin = msg.info.origin
         self.frontier = np.zeros((self.width, self.height,1), dtype=np.uint8)
+        self.front_points = self.connected_components()
         self.find_borders()
-        #self.front_points = self.connected_components()
         #print(self.front_points)
+        
 
     def to_grid(self, px, py, origin_, resolution):
         offsetx = (1/resolution)*(px - origin_[1] + self.corr_x)
@@ -59,7 +60,7 @@ class frontier_finder():
         return (offsetx, offsety)
 
     def to_index(self, gx, gy, size_x):
-        return gx * size_x + gy
+        return gy * size_x + gx
     
     def find_borders(self):
         # This turns the map -> binary frontier 
@@ -80,8 +81,10 @@ class frontier_finder():
         self.front_points = self.connected_components()
         outputmsg = [] 
         for point in self.front_points:
-            p = Point(point[0], point[1],0,0)
+            w_p = self.to_world(point[0], point[1], (self.origin.position.x, self.origin.position.y), self.resolution)
+            p = Point(w_p[0], w_p[1], 0)
             outputmsg.append(p)
+        
         self.pub_frontier.publish(outputmsg)
 
     def connected_components(self):
@@ -91,6 +94,11 @@ class frontier_finder():
         (totalLabels, label_ids, values, centroid) = analysis
         return centroid
 
+    def to_world(self, gx, gy, origin, resolution):
+        offsetx = (resolution)*gx + origin[1] - self.corr_x
+        offsety = (resolution)*gy + origin[0]
+        return (offsetx, offsety)
+
     def run(self):
 
         # PROCESS LINES IN OCCUPENCY GRID
@@ -98,6 +106,7 @@ class frontier_finder():
         # PUBLISH LIST OF FRONTIERS
         r = rospy.Rate(1)
         while not rospy.is_shutdown:
+            
             r.sleep()
         pass
 

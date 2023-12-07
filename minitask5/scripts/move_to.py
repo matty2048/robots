@@ -28,7 +28,8 @@ class move_to:
         
         # Variable initialisation
         self.pos = Position(0, 0, 0)
-        self.frontiers = [Point(x= -1.5, y = -1)]
+        self.frontiers = []
+        self.corr_x = 0.3
 
         # Turn condition variable initialisation
         # self.turn = 0
@@ -36,15 +37,16 @@ class move_to:
         self.turn = 0
 
         # Publisher and Subcriber initialisation
-        # rospy.Subscriber('/frontiers', frontiers, self.callback_frontiers)
+        rospy.Subscriber('/frontiers', frontiers, self.callback_frontiers)
+        self.vel_pub = rospy.Publisher('cmd_vel', Twist, queue_size=10)
         rospy.Subscriber('scan', LaserScan, self.callback_laser)
         rospy.Subscriber('odom', Odometry, self.callback_odom)
 
         # Create main node
         rospy.init_node('move_to.py', anonymous=False)
 
-    def callback_frontiers(self):
-        self.frontiers = [Point(x= -1.5, y = -1)]
+    def callback_frontiers(self, msg):
+        self.frontiers = msg.frontiers
 
     def callback_laser(self, msg):
         self.ranges = msg.ranges
@@ -95,7 +97,7 @@ class move_to:
         rospy.loginfo("Sending goal location ...")
         ac.send_goal(goal)
 
-        ac.wait_for_result(rospy.Duration(60))
+        ac.wait_for_result(rospy.Duration(15))
 
         if(ac.get_state() ==  GoalStatus.SUCCEEDED):
             rospy.loginfo("You have reached the destination")
@@ -113,28 +115,37 @@ class move_to:
         self.pos.y = msg.pose.pose.position.y
 
     def decide_goal(self):
-        goal = self.frontiers[0]
-        return goal
+        fronts = self.frontiers
+        if not len(fronts): return None
+        distances = [math.dist((self.pos.x, self.pos.y), (i.x, i.y)) for i in fronts]
+        goals = sorted(list(zip(distances, fronts)), key= lambda x: x[0])
+        return goals[0][1]
+        # for goal in goals:
+        #     if goal[0] < 1: continue
+        #     else: return goal[1]
+        # return goals[0][1]
+        
 
     def run(self):
         r = rospy.Rate(self.SLEEP_RATE)
         # Whilst not shutdown OR Found all objects
-        
-        t = rospy.Time.now().to_sec()
-        vel_pub = rospy.Publisher('cmd_vel', Twist, queue_size=10)
-        num_secs = 10
-        while rospy.Time.now().to_sec() - t < rospy.Duration(num_secs).to_sec():
+        r.sleep()
 
-            vel_msg = Twist()
-            vel_msg.angular.z = 0.314
-            vel_pub.publish( vel_msg )
-            r.sleep()
 
         while not rospy.is_shutdown():
-            # goal: Point
-            # goal = self.decide_goal()
-            # print(goal)
-            # self.moveToGoal(goal.x, goal.y)
+            t = rospy.Time.now().to_sec()
+            # num_secs = 10
+            # back = self.ranges[160:200]
+            # front = self.ranges[340:360] + self.ranges[0:20]
+            # while rospy.Time.now().to_sec() - t < rospy.Duration(num_secs).to_sec() and (min(back) > 0.4 and min(front) < 0.4):
+            #     vel_msg = Twist()
+            #     vel_msg.linear.x = -0.04
+            #     self.vel_pub.publish( vel_msg )
+            #     r.sleep()
+            # goal: Point = self.decide_goal()
+            # if goal == None: continue
+            # if not self.moveToGoal(goal.x - self.corr_x , goal.y):
+            #     print("failed to reach goal")
 
             # Move to main controller set up 
             # Check for certainty of position with covariance to activate move_base
@@ -144,6 +155,5 @@ if __name__ == '__main__':
     try:
         main = move_to()
         main.run()
-        rospy.spin()
     except rospy.ROSInterruptException:
         pass
