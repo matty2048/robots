@@ -192,11 +192,10 @@ class map_navigation():
         self.old_grid.info.resolution = self.res
         self.old_grid.info.origin.position.x = self.to_world(0, 0, self.origin_, self.res)[0]
         self.old_grid.info.origin.position.y = self.to_world(0, 0, self.origin_, self.res)[1]
-        # publish_grid = [int(sum(x)/len(past_grids)) for x in zip(*past_grids)]
-        # publish_grid = [x if x >= 0 else -1 for x in publish_grid]
+        publish_grid = [int(sum(x)/len(past_grids)) for x in zip(*past_grids)]
+        publish_grid = [x if x >= 0 else -1 for x in publish_grid]
 
-        publish_grid = list[int] = [-1]*self.size_x*self.size_y
-        for 
+        # publish_grid = list[int] = [-1]*self.size_x*self.size_y
         self.old_grid.data = publish_grid
         self.occ_pub.publish(self.old_grid)
         return
@@ -234,7 +233,7 @@ class map_navigation():
             self.past_grids.append(self.grid)
             self.map_all_lines()
             self.renew_objects()
-            self.grid = self.pub_occ_grid(self.past_grids)
+            self.pub_occ_grid(self.past_grids)
             if len(self.past_grids) >= 6:
                 self.past_grids = self.past_grids[1:]
             r.sleep()

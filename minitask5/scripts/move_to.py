@@ -134,18 +134,18 @@ class move_to:
 
         while not rospy.is_shutdown():
             t = rospy.Time.now().to_sec()
-            num_secs = 10
-            back = self.ranges[160:200]
-            front = self.ranges[340:360] + self.ranges[0:20]
-            while rospy.Time.now().to_sec() - t < rospy.Duration(num_secs).to_sec() and (min(back) > 0.4 and min(front) < 0.4):
-                vel_msg = Twist()
-                vel_msg.linear.x = -0.04
-                self.vel_pub.publish( vel_msg )
-                r.sleep()
-            goal: Point = self.decide_goal()
-            if goal == None: continue
-            if not self.moveToGoal(goal.x - self.corr_x , goal.y):
-                print("failed to reach goal")
+            # num_secs = 10
+            # back = self.ranges[160:200]
+            # front = self.ranges[340:360] + self.ranges[0:20]
+            # while rospy.Time.now().to_sec() - t < rospy.Duration(num_secs).to_sec() and (min(back) > 0.4 and min(front) < 0.4):
+            #     vel_msg = Twist()
+            #     vel_msg.linear.x = -0.04
+            #     self.vel_pub.publish( vel_msg )
+            #     r.sleep()
+            # goal: Point = self.decide_goal()
+            # if goal == None: continue
+            # if not self.moveToGoal(goal.x - self.corr_x , goal.y):
+            #     print("failed to reach goal")
 
             # Move to main controller set up 
             # Check for certainty of position with covariance to activate move_base
