@@ -119,7 +119,7 @@ class move_to:
         if not len(fronts): return None
         distances = [math.dist((self.pos.x, self.pos.y), (i.x, i.y)) for i in fronts]
         goals = sorted(list(zip(distances, fronts)), key= lambda x: x[0])
-        return goals[-1][1]
+        return goals[0][1]
         # for goal in goals:
         #     if goal[0] < 1: continue
         #     else: return goal[1]
@@ -137,18 +137,13 @@ class move_to:
             num_secs = 10
             back = self.ranges[160:200]
             front = self.ranges[340:360] + self.ranges[0:20]
-            while rospy.Time.now().to_sec() - t < rospy.Duration(num_secs).to_sec() and (min(back) > 0.4 and min(front) < 0.5):
+            while rospy.Time.now().to_sec() - t < rospy.Duration(num_secs).to_sec() and (min(back) > 0.4 and min(front) < 0.4):
                 vel_msg = Twist()
                 vel_msg.linear.x = -0.04
                 self.vel_pub.publish( vel_msg )
                 r.sleep()
-
             goal: Point = self.decide_goal()
             if goal == None: continue
-            print(goal)
-            print(self.pos.x, self.pos.y)
-            print()
-            print()
             if not self.moveToGoal(goal.x - self.corr_x , goal.y):
                 print("failed to reach goal")
 
