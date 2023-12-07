@@ -45,6 +45,7 @@ class map_navigation():
         self.corr_x = rospy.get_param(node_name + '/corr_x')
         self.size_x = rospy.get_param(node_name + '/size_x')
         self.size_y = rospy.get_param(node_name + '/size_y')
+        self.buffer = rospy.get_param(node_name + '/buffer_size')
         self.res = rospy.get_param(node_name + '/res')
         self.grid : list[int] = [-1]*self.size_x*self.size_y
         self.origin_ = origin
@@ -167,9 +168,10 @@ class map_navigation():
 
     def renew_objects(self):
         # if not self.obj_loc_changed: return
-        self.change_all_objects_to(self.new_obj_loc, 0)
-        self.change_all_objects_to(self.new_obj_loc, 100)
+        # self.change_all_objects_to(self.TEMP_OBJECT_LIST, 0)
+        # self.change_all_objects_to(self.TEMP_OBJECT_LIST, 100)
         # self.obj_loc_changed = False
+        pass
 
     def change_all_objects_to(self, obj_list, probability):
         # CHANGE IN FULL IMPLEMENTATION
@@ -180,7 +182,7 @@ class map_navigation():
 
     def map_object_value_to(self, object_found: object_data, grid, probability=100):
         size_r = int(object_found.rough_size  / 2*(1/self.res))
-        centre = self.to_grid(object_found.y_location, object_found.x_location + self.corr_x, self.origin_, self.res)
+        centre = self.to_grid(object_found.x_location, object_found.y_location + self.corr_x, self.origin_, self.res)
         for i in range(-size_r, size_r):
             for j in range(-size_r, size_r):
                 grid[self.to_index(centre[0] + i, centre[1] + j, self.size_x)] = probability
@@ -221,8 +223,9 @@ class map_navigation():
             rads = (radians(i) + cur_angle - math.pi/2) 
             endpos = self.to_grid(cur_pos[0] + (points[i]) * -math.sin(rads), cur_pos[1] + (points[i]) * math.cos(rads), self.origin_, self.res)
             gridpoints = self.get_line(cur_pos_grid, endpos)
-            temp = (gridpoints[-2][0], gridpoints[-2][1])
-            self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 100
+            for i in range(self.buffer):
+                temp = (gridpoints[-2 - i][0], gridpoints[-2 - i][1])
+                self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 100
             temp = (gridpoints[-1][0], gridpoints[-1][1])
             self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 100
 

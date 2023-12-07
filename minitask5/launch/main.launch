@@ -29,6 +29,7 @@
     <param name="size_x"              value="384"/>
     <param name="size_y"              value="384"/>
     <param name="res"                 value="0.05"/>
+    <param name="buffer_size"         value="1"/>
   </node>
   <node name="frontier_mapping" pkg="minitask5" type="mapping.py" output="screen">
     <param name="map_provided"        value="False"/>
@@ -37,6 +38,7 @@
     <param name="size_x"              value="192"/>
     <param name="size_y"              value="192"/>
     <param name="res"                 value="0.1"/>
+    <param name="buffer_size"         value="3"/>
   </node>
 
   <!-- Navigation -->
@@ -60,7 +62,7 @@
 
   <!-- AMCL -->
   <include file="$(find turtlebot3_navigation)/launch/amcl.launch">
-    <arg name="initial_pose_x" value="-1.15"/>
+    <arg name="initial_pose_x" value="-1.05"/>
     <arg name="initial_pose_y" value="4.20"/>
     <arg name="initial_pose_a" value="0.0"/>
   </include>

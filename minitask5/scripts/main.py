@@ -7,7 +7,7 @@ from geometry_msgs.msg import Point
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry, OccupancyGrid, MapMetaData
 from sensor_msgs.msg import LaserScan, Image
-from minitask5.msg import controller
+from minitask5.msg import image_proc
 import tf
 import numpy as np
 import math
@@ -27,41 +27,34 @@ class Main:
         self.param_max_red_hydrants = rospy.get_param('/main/max_red_hydrants')
 
         # Variable initialisation
-        self.states = controller()
-        self.pos = Position(0, 0, 0)
+        self.objects_found = []
 
         # Publisher and Subcriber initialisation
-        self.control_pub = rospy.Publisher('mt5_control', controller, queue_size=10)
-        self.state_sub = rospy.Subscriber('mt5_control', controller, self.callback_controller)
-        rospy.Subscriber('scan', LaserScan, self.callback_laser)
-        rospy.Subscriber('odom', Odometry, self.callback_odom)
+        # rospy.Subscriber('scan', LaserScan, self.callback_laser)
+        # rospy.Subscriber('odom', Odometry, self.callback_odom)
+        rospy.Subscriber('/image_proc', image_proc, self.callback_objects)
 
         # Create main node
-        rospy.init_node('main_controller', anonymous=False)
+        rospy.init_node('main', anonymous=False)
 
-    def callback_laser(self, msg):
-        self.ranges = msg.ranges
+    def callback_objects(self, msg):
+        pass
 
-    def callback_odom(self, msg):
-        quarternion = [msg.pose.pose.orientation.x,msg.pose.pose.orientation.y,msg.pose.pose.orientation.z, msg.pose.pose.orientation.w]
-        (roll, pitch, yaw) = tf.transformations.euler_from_quaternion(quarternion)
-        self.pos.theta = yaw
-        self.pos.x = msg.pose.pose.position.x
-        self.pos.y = msg.pose.pose.position.y
+    # def callback_laser(self, msg):
+    #     self.ranges = msg.ranges
 
-    def callback_controller(self, msg):
-        self.states.state_find_goal = msg.state_find_goal
-        self.states.state_object_avoid = msg.state_object_avoid
-        self.states.state_random_walk = msg.state_random_walk
+    # def callback_odom(self, msg):
+    #     quarternion = [msg.pose.pose.orientation.x,msg.pose.pose.orientation.y,msg.pose.pose.orientation.z, msg.pose.pose.orientation.w]
+    #     (roll, pitch, yaw) = tf.transformations.euler_from_quaternion(quarternion)
+    #     self.pos.theta = yaw
+    #     self.pos.x = msg.pose.pose.position.x
+    #     self.pos.y = msg.pose.pose.position.y
 
     def run(self):
         r = rospy.Rate(self.SLEEP_RATE)
         # Whilst not shutdown OR Found all objects
         while not rospy.is_shutdown():
-            self.control_pub.publish(controller(state_object_avoid = 1))
-            # If no green objects in sight
-                # Random Walk
-            # elif 
+            
             r.sleep()
             
 
