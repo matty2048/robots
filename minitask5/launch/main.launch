@@ -22,8 +22,22 @@
     <param name="max_red_hydrants"            value="2"/>
   </node>
   <!-- <node name="scan_obj" pkg="minitask5" type="scan_obj.py" output="screen"/> -->
-  <node name="mapping" pkg="minitask5" type="mapping.py" output="screen"/>
-  <node name="frontier_mapping" pkg="minitask5" type="frontier_mapping.py" output="screen"/>
+  <node name="mapping" pkg="minitask5" type="mapping.py" output="screen">
+    <param name="map_provided"        value="True"/>
+    <param name="pub_to"              value="/map"/>
+    <param name="corr_x"              value="0.3"/>
+    <param name="size_x"              value="384"/>
+    <param name="size_y"              value="384"/>
+    <param name="res"                 value="0.05"/>
+  </node>
+  <node name="frontier_mapping" pkg="minitask5" type="mapping.py" output="screen">
+    <param name="map_provided"        value="False"/>
+    <param name="pub_to"              value="/map_frontier"/>
+    <param name="corr_x"              value="0.3"/>
+    <param name="size_x"              value="192"/>
+    <param name="size_y"              value="192"/>
+    <param name="res"                 value="0.1"/>
+  </node>
 
   <!-- Navigation -->
   <!-- <include file="$(find minitask5)/launch/minitask5_navigation.launch"> -->
