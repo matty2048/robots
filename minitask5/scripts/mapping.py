@@ -17,6 +17,7 @@ class Position:
         self.theta : float = theta
 
 class map_navigation():
+    ROBOT_WIDTH = 0.2
 
     def __init__(self, res = 0.05, origin = (-10, -10), threshold = 0.65):
         self.old_obj_loc: object_data = []
@@ -207,25 +208,40 @@ class map_navigation():
         cur_angle = self.pos.theta
         for i in range(len(points)):
             if points[i] == 0: continue
-            if i % 2 == 0: continue
             if (abs(points[i] - points[(i + 1) % 360]) > 0.15 ) and (abs(points[i] - points[(i - 1) %360]) > 0.15 ): continue
             rads = (radians(i) + cur_angle - math.pi/2) 
             endpos = self.to_grid(cur_pos[0] + (points[i]) * -math.sin(rads), cur_pos[1] + (points[i]) * math.cos(rads), self.origin_, self.res)
             gridpoints = self.get_line(cur_pos_grid, endpos)
-            for j in range(len(gridpoints)-1):
+            for j in range(len(gridpoints)-2):
                 temp = (gridpoints[j][0], gridpoints[j][1])
                 self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 0
+
+        for i in range(len(points)):
+            if points[i] == 0: continue
+            rads = (radians(i) + cur_angle - math.pi/2) 
+            endpos = self.to_grid(cur_pos[0] + (points[i]) * -math.sin(rads), cur_pos[1] + (points[i]) * math.cos(rads), self.origin_, self.res)
+            gridpoints = self.get_line(cur_pos_grid, endpos)
             temp = (gridpoints[-2][0], gridpoints[-2][1])
             self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 100
             temp = (gridpoints[-1][0], gridpoints[-1][1])
             self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 100
+
+        for i in range(len(points)):
+            if points[i] == 0: continue
+            rads = (radians(i) + cur_angle - math.pi/2) 
+            endpos = self.to_grid(cur_pos[0] + (points[i]) * -math.sin(rads), cur_pos[1] + (points[i]) * math.cos(rads), self.origin_, self.res)
+            endpos_prev = self.to_grid(cur_pos[0] + (points[(i - 1) %360]) * -math.sin(rads - math.pi/180), cur_pos[1] + (points[(i - 1) %360]) * math.cos(rads- math.pi/180), self.origin_, self.res)
+            gridpoints = self.get_line(endpos, endpos_prev)
+            if len(gridpoints) < 2 + self.ROBOT_WIDTH/self.res:
+                for j in range(len(gridpoints)-1):
+                    temp = (gridpoints[j][0], gridpoints[j][1])
+                    self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 100
         return
 
     def run(self):
         r = rospy.Rate(1)
         while not self.grid:
             r.sleep()
-        
         print("size_x={size_x}, size_y={size_y}, grid size={grid_size}, origin_={pos}".format(size_x=self.size_x, size_y=self.size_y, grid_size=np.array(self.grid).size, pos=self.origin_))
         self.past_grids = []
         print(self.pos.x, self.pos.y, self.pos.theta)
