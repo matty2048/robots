@@ -16,6 +16,8 @@ class Position:
         self.y : float = y
         self.theta : float = theta
 
+
+
 class map_navigation():
     ROBOT_WIDTH = 0.2
 
@@ -30,31 +32,29 @@ class map_navigation():
         self.threshold = threshold
         self.old_grid = OccupancyGrid()
         self.objects_found = []
-        self.corr_x = 0.3
         self.past_grids = []
-        try:
-            current_map = self.get_map_client()
-            self.size_x = current_map.info.width
-            self.size_y = current_map.info.height
-            self.res = current_map.info.resolution
-            self.origin_ = (current_map.info.origin.position.x, current_map.info.origin.position.y)
-            new_map = self.adjust_map(int(0/self.res), int(0/self.res), self.size_x, list(current_map.data))
-            self.grid = new_map
-
-        except:
-            print("Failed to retrieve map")
-            self.size_x = 384
-            self.size_y = 384
-            self.grid : list[int] = [-1]*self.size_x*self.size_y
-            self.origin_ = origin
-            self.res = res
-
-        self.occ_pub = rospy.Publisher('/map', OccupancyGrid, queue_size=10)
         rospy.Subscriber('/scan', LaserScan, self.callback_laser)
         rospy.Subscriber('/odom', Odometry, self.callback_odom)
         rospy.Subscriber('/image_proc', image_proc, self.callback_object)
         rospy.init_node('map_navigation', anonymous=True)
-    
+
+        node_name= rospy.get_name()
+        map_provided = rospy.get_param(node_name +'/map_provided')
+        pub_to = rospy.get_param(node_name + '/pub_to')
+        self.occ_pub = rospy.Publisher(pub_to, OccupancyGrid, queue_size=10)
+        self.corr_x = rospy.get_param(node_name + '/corr_x')
+        self.size_x = rospy.get_param(node_name + '/size_x')
+        self.size_y = rospy.get_param(node_name + '/size_y')
+        self.res = rospy.get_param(node_name + '/res')
+        self.grid : list[int] = [-1]*self.size_x*self.size_y
+        self.origin_ = origin
+        if map_provided:
+            try:
+                current_map = self.get_map_client()
+                self.origin_ = (current_map.info.origin.position.x, current_map.info.origin.position.y)
+                self.grid = self.adjust_map(int(0/self.res), int(0/self.res), self.size_x, list(current_map.data))
+            except:
+                print("Failed to retrieve map")
     
     def callback_object(self, msg: image_proc):
         # if self.new_obj_loc== msg.object_data: return
