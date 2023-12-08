@@ -10,8 +10,10 @@
   <arg name="open_rviz" default="true"/>
   <!-- <arg name="move_forward_only" default="false"/> -->
 
+
   <node name="main" pkg="minitask5" type="main.py" output="screen">
     <rosparam file="$(find minitask5)/param/main_params.yaml" command="load" />
+
   </node>
 
   <node name="frontier_finder" pkg="minitask5" type="frontier_finder.py" output="screen"/>
