@@ -42,7 +42,8 @@ class Camera:
         self.bridge = cv_bridge.CvBridge()
         #cv2.namedWindow("original", 1)
         self.image_sub = rospy.Subscriber('camera/rgb/image_raw', Image, self.image_callback)
-        self.depth_sub = rospy.Subscriber('camera/depth/points', PointCloud2, self.depth_callback)
+        #self.depth_sub = rospy.Subscriber('camera/depth/points', PointCloud2, self.depth_callback)
+        rospy.Subscriber('scan', LaserScan, self.callback_laser)
         self.obj_pub = rospy.Publisher('/image_proc', image_proc, queue_size=10)
         self.stamp_pub = rospy.Publisher('point2', PointStamped, queue_size=10)
         self.image_resized = []
@@ -60,14 +61,23 @@ class Camera:
         self.listener = tf2.TransformListener(self.buffer)
         cv2.startWindowThread()
     
+
+    def callback_laser(self, msg):
+        self.ranges = msg.ranges
+        self.range_min = msg.range_min
+        self.range_max = msg.range_max
+
     def image_callback(self, msg):
         self.image = self.bridge.imgmsg_to_cv2(msg,desired_encoding='bgr8')
         (h, w) = self.image.shape[:2]
-        self.image = cv2.resize(self.image, (int(w),int(h)))
+        self.image = cv2.resize(self.image, (int(w/4),int(h/4)))
         # use hsv for green and blue as the boxes are seprable in this color space
         hsv = cv2.cvtColor(self.image, cv2.COLOR_BGR2HSV)
         # use hsl for red as the brick walls confused it with hsv
         hsl = cv2.cvtColor(self.image, cv2.COLOR_BGR2HLS)
+        self.width = w
+        self.height = h
+        self.img_ready = True
 
         # extract tuned range of HSV and create mask 
         blueLowerValues = np.array([90, 160, 160])
@@ -89,10 +99,22 @@ class Camera:
         redMask2 = cv2.inRange(hsl, redLowerValues2, redUpperValues2)
         self.redMask = redMask1  + redMask2 
 
+
+        analysis = cv2.connectedComponentsWithStats(self.greenMask, 4, cv2.CV_32S)
+        (totalLabels, label_ids, stats, centroid) = analysis
+        data = []
+        for i in range(1, totalLabels):
+            pass
+            # print("i can see a green goal: ", i)
         
-        self.width = w
-        self.height = h
-        self.img_ready = True
+
+        analysis = cv2.connectedComponentsWithStats(self.redMask, 4, cv2.CV_32S)
+        (totalLabels, label_ids, stats, centroid) = analysis
+        data = []
+        for i in range(1, totalLabels):
+            # print("i can see a red goal: ", i)
+            pass
+        
     
     def xytoidx(self, x, y):
         return 1920*y + x
@@ -162,6 +184,7 @@ class Camera:
         (totalLabels, label_ids, stats, centroid) = analysis
         # data = []
         for i in range(1,totalLabels):
+            # print("I can see a red goal")
             dat = object_data()
             dat.red = 255
             #get centreoid
@@ -187,6 +210,7 @@ class Camera:
                                             cv2.CV_32S)
         (totalLabels, label_ids, stats, centroid) = analysis
         for i in range(1,totalLabels):
+            print("I can see a green goal")
             dat = object_data()
             dat.green = 255
             #get centroid 

@@ -261,10 +261,10 @@ class map_navigation():
             endpos = self.to_grid(cur_pos[0] + (points[i]) * -math.sin(rads), cur_pos[1] + (points[i]) * math.cos(rads), self.origin_, self.res)
             gridpoints = self.get_line(cur_pos_grid, endpos)
             for i in range(self.buffer):
-                temp = (gridpoints[-2 - i][0], gridpoints[-2 - i][1])
+                temp = (gridpoints[-1 - i][0], gridpoints[-1 - i][1])
                 self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 100
-            temp = (gridpoints[-1][0], gridpoints[-1][1])
-            self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 100
+            # temp = (gridpoints[-1][0], gridpoints[-1][1])
+            # self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 100
 
         # If interpolation is required, obstacles are placed between LIDAR readings within a certain distance of each other
         if self.interpolation:

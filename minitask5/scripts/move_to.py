@@ -76,6 +76,9 @@ class move_to:
 
     def moveToGoal(self,xGoal,yGoal,orientation = 1.0):
 
+        
+        self.last_goal = (xGoal, yGoal)
+        
         #define a client for to send goal requests to the move_base server through a SimpleActionClient
         ac = actionlib.SimpleActionClient("move_base", MoveBaseAction)
 
@@ -86,7 +89,6 @@ class move_to:
 
         goal = MoveBaseGoal()
         
-        self.last_goal = (xGoal, yGoal)
         stamp = PointStamped(header=Header(stamp=rospy.Time.now(),
                                               frame_id="odom"),
                                 point=Point(xGoal, yGoal, 0.0))
@@ -108,7 +110,7 @@ class move_to:
         rospy.loginfo("Sending goal location ...")
         ac.send_goal(goal)
 
-        ac.wait_for_result(rospy.Duration(30))
+        ac.wait_for_result(rospy.Duration.from_sec(30))
 
         if(ac.get_state() ==  GoalStatus.SUCCEEDED):
             rospy.loginfo("You have reached the destination")
@@ -147,7 +149,7 @@ class move_to:
         # Whilst not shutdown OR Found all objects
         r.sleep()
         t = rospy.Time.now().to_sec()
-        num_secs = 2
+        num_secs = 3
         back = self.ranges[160:200]
         front = self.ranges[340:360] + self.ranges[0:20]
         while rospy.Time.now().to_sec() - t < rospy.Duration(num_secs).to_sec() and (min(back) > 0.4 and min(front) < 0.4):
@@ -156,6 +158,10 @@ class move_to:
             self.vel_pub.publish( vel_msg )
             r.sleep()
 
+        num_secs = 10
+        while rospy.Time.now().to_sec() - t < rospy.Duration(num_secs).to_sec():
+            self.vel_pub.publish( Twist() )
+            r.sleep()
         while not rospy.is_shutdown():
             
             goal: Point = self.decide_goal()

@@ -10,7 +10,7 @@
   <arg name="open_rviz" default="true"/>
   <!-- <arg name="move_forward_only" default="false"/> -->
 
-  <node name="main" pkg="minitask5" type="main.py" output="screen">
+  <node name="main" pkg="minitask5" type="main.py" >
     <param name="max_green_boxes"             value="2"/>
     <param name="max_red_hydrants"            value="2"/>
     <param name="red_radius"                  value="0.4"/>
@@ -46,7 +46,7 @@
     <param name="size_x"              value="192"/>
     <param name="size_y"              value="192"/>
     <param name="res"                 value="0.1"/>
-    <param name="buffer_size"         value="2"/>
+    <param name="buffer_size"         value="1"/>
     <param name="blue_tiles_provided" value="False"/>
     <param name="interpolation"       value="True"/>
   </node>
