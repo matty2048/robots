@@ -18,6 +18,15 @@ class Position:
 
 class map_navigation():
     ROBOT_WIDTH = 0.2
+    BLUE_TILE_X_CORR = 0
+    BLUE_TILE_Y_CORR = -0.3
+    BLUE_TILE_SIZE = 0
+    BLUE_TILE_LIST = [
+        object_data(blue= 255, x_location= -0.329, y_location= 0.0587+ BLUE_TILE_Y_CORR, rough_size= 0.50 + BLUE_TILE_SIZE),
+        object_data(blue= 255, x_location= 0.269, y_location= -0.6706+ BLUE_TILE_Y_CORR, rough_size= 0.50 + BLUE_TILE_SIZE),
+        object_data(blue= 255, x_location= 0.316, y_location= 0.6272+ BLUE_TILE_Y_CORR, rough_size= 0.50 + BLUE_TILE_SIZE),
+        object_data(blue= 255, x_location= 0.9469, y_location= -3.15+ BLUE_TILE_Y_CORR, rough_size= 0.50 + BLUE_TILE_SIZE),
+    ]
 
     def __init__(self, res = 0.05, origin = (-10, -10), threshold = 0.65):
         self.old_obj_loc: object_data = []
@@ -45,6 +54,7 @@ class map_navigation():
         self.size_y = rospy.get_param(node_name + '/size_y')
         self.buffer = rospy.get_param(node_name + '/buffer_size')
         self.res = rospy.get_param(node_name + '/res')
+        self.blue_tiles_provided = rospy.get_param(node_name + '/blue_tiles_provided')
         self.grid : list[int] = [-1]*self.size_x*self.size_y
         self.origin_ = origin
         if map_provided:
@@ -166,10 +176,10 @@ class map_navigation():
 
     def renew_objects(self):
         # if not self.obj_loc_changed: return
-        # self.change_all_objects_to(self.TEMP_OBJECT_LIST, 0)
-        # self.change_all_objects_to(self.TEMP_OBJECT_LIST, 100)
+        if self.blue_tiles_provided:
+            self.change_all_objects_to(self.BLUE_TILE_LIST, 0)
+            self.change_all_objects_to(self.BLUE_TILE_LIST, 100)
         # self.obj_loc_changed = False
-        pass
 
     def change_all_objects_to(self, obj_list, probability):
         # CHANGE IN FULL IMPLEMENTATION

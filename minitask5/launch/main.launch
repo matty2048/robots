@@ -35,6 +35,7 @@
     <param name="size_y"              value="384"/>
     <param name="res"                 value="0.05"/>
     <param name="buffer_size"         value="1"/>
+    <param name="blue_tiles_provided" value="True"/>
   </node>
   <node name="frontier_mapping" pkg="minitask5" type="mapping.py" output="screen">
     <param name="map_provided"        value="False"/>
@@ -44,6 +45,7 @@
     <param name="size_y"              value="192"/>
     <param name="res"                 value="0.1"/>
     <param name="buffer_size"         value="2"/>
+    <param name="blue_tiles_provided" value="False"/>
   </node>
 
   <!-- Navigation -->

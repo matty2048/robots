@@ -48,9 +48,12 @@ class Main:
         # rospy.Subscriber('scan', LaserScan, self.callback_laser)
         rospy.Subscriber('map', OccupancyGrid, self.callback_occ)
         rospy.Subscriber('/image_proc', image_proc, self.callback_objects)
+        rospy.Subscriber('odom', Odometry, self.callback_odom)
 
         # Create main node
         rospy.init_node('main', anonymous=False)
+        self.node_name= rospy.get_name()
+        rospy.on_shutdown(self.callback_shutdown) 
 
     def callback_objects(self, msg: image_proc):
         self.objects_found = msg.object_data
@@ -68,13 +71,6 @@ class Main:
         self.pos.theta = yaw
         self.pos.x = msg.pose.pose.position.x
         self.pos.y = msg.pose.pose.position.y
-
-    def callback_odom(self, msg):
-        quarternion = [msg.pose.pose.orientation.x,msg.pose.pose.orientation.y,msg.pose.pose.orientation.z, msg.pose.pose.orientation.w]
-        (roll, pitch, yaw) = tf.transformations.euler_from_quaternion(quarternion) # type: ignore
-        self.pos.theta = yaw
-        self.pos.x = msg.pose.pose.position.x
-        self.pos.y = msg.pose.pose.position.y 
 
     def add_objects_to_list(self):
         for obj in self.objects_found:
@@ -130,14 +126,37 @@ class Main:
     def to_index(self, gx, gy, size_x):
         return gy * size_x + gx
 
+    def callback_shutdown(self):
+        print(self.node_name + " shutting down")
+        print("Found {r_len} number of red objects and {g_len} number of green objects".format(r_len= len(self.red_obj), g_len= len(self.green_obj)))
+        if len(self.red_obj) >= 2 * self.param_max_red_hydrants:
+            print("Found too many red objects to print")
+        else: print(self.red_obj)
+        if len(self.green_obj) >= 2 * self.param_max_green_boxes:
+            print("Found too many green objects to print")
+        else: print(self.green_obj)
+
     def run(self):
         r = rospy.Rate(self.SLEEP_RATE)
         # Whilst not shutdown OR Found all objects
+        found_red = False
+        found_green = False
         while not rospy.is_shutdown():
             self.add_objects_to_list()
-            print(len(self.red_obj))
-            print(len(self.green_obj))
-            print()
+
+            if len(self.red_obj) == self.param_max_red_hydrants and not found_red: 
+                print("Found all red objects at locations:")
+                print(self.red_obj)
+                found_red = True
+            
+            if len(self.green_obj) == self.param_max_green_boxes and not found_green:
+                print("Found all green objects at locations:")
+                print(self.green_obj)
+                found_green = True
+            
+            if len(self.red_obj) > 2*self.param_max_red_hydrants or len(self.green_obj) > 2*self.param_max_green_boxes:
+                print("Found too many red or green objects, shutting down node safely")
+                break
             r.sleep()
             
 
