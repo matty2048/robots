@@ -85,11 +85,10 @@ class move_to:
 
 
         goal = MoveBaseGoal()
-        if((xGoal, yGoal) == self.last_goal):
-            return
+        
         self.last_goal = (xGoal, yGoal)
         stamp = PointStamped(header=Header(stamp=rospy.Time.now(),
-                                              frame_id="global"),
+                                              frame_id="odom"),
                                 point=Point(xGoal, yGoal, 0.0))
         
         self.stamp_pub.publish(stamp)
@@ -129,14 +128,15 @@ class move_to:
 
     def decide_goal(self):
         fronts = self.frontiers
+        return self.frontiers[0]
         #print(fronts)
-        if not len(fronts): return None
-        distances = [math.dist((self.pos.x, self.pos.y), (i.x, i.y)) for i in fronts]
-        goals = sorted(list(zip(distances, fronts)), key= lambda x: x[0])
-        goal = goals[0][1]
-        goal.y = goal.y
-        return goal
-        # for goal in goals:
+        # if not len(fronts): return None
+        # distances = [math.dist((self.pos.x, self.pos.y), (i.x, i.y)) for i in fronts]
+        # goals = sorted(list(zip(distances, fronts)), key= lambda x: x[0])
+        # goal = goals[0][1]
+        # goal.y = goal.y
+        # return goal
+        # # for goal in goals:
         #     if goal[0] < 1: continue
         #     else: return goal[1]
         # return goals[0][1]
@@ -161,7 +161,8 @@ class move_to:
             goal: Point = self.decide_goal()
             if goal == None: continue
             if not self.moveToGoal(goal.x, goal.y):
-                #goal = np.random.shuffle(self.frontiers)[0]
+                np.random.shuffle(self.frontiers)
+                continue
                 print("failed to reach goal")
 
             # Move to main controller set up 
