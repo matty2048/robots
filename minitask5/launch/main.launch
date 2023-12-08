@@ -10,14 +10,10 @@
   <arg name="open_rviz" default="true"/>
   <!-- <arg name="move_forward_only" default="false"/> -->
 
-  <node name="main" pkg="minitask5" type="main.py" >
-    <param name="max_green_boxes"             value="2"/>
-    <param name="max_red_hydrants"            value="2"/>
-    <param name="red_radius"                  value="0.4"/>
-    <param name="green_radius"                value="0.5"/>
-    <param name="red_tolerance"               value="1"/>
-    <param name="green_tolerance"             value="1"/>
-    <param name="detection_range"             value="1.5"/>
+
+  <node name="main" pkg="minitask5" type="main.py" output="screen">
+    <rosparam file="$(find minitask5)/param/main_params.yaml" command="load" />
+
   </node>
 
   <node name="frontier_finder" pkg="minitask5" type="frontier_finder.py" output="screen"/>
@@ -29,38 +25,11 @@
   </node>
   <!-- <node name="scan_obj" pkg="minitask5" type="scan_obj.py" output="screen"/> -->
   <node name="mapping" pkg="minitask5" type="mapping.py" output="screen">
-    <param name="map_provided"        value="True"/>
-    <param name="pub_to"              value="/map"/>
-    <param name="corr_x"              value="0.3"/>
-    <param name="size_x"              value="384"/>
-    <param name="size_y"              value="384"/>
-    <param name="res"                 value="0.05"/>
-    <param name="buffer_size"         value="1"/>
-    <param name="blue_tiles_provided" value="True"/>
-    <param name="interpolation"       value="True"/>
+    <rosparam file="$(find minitask5)/param/mapping_params.yaml" command="load" />
   </node>
   <node name="frontier_mapping" pkg="minitask5" type="mapping.py" output="screen">
-    <param name="map_provided"        value="False"/>
-    <param name="pub_to"              value="/map_frontier"/>
-    <param name="corr_x"              value="0.3"/>
-    <param name="size_x"              value="192"/>
-    <param name="size_y"              value="192"/>
-    <param name="res"                 value="0.1"/>
-    <param name="buffer_size"         value="1"/>
-    <param name="blue_tiles_provided" value="False"/>
-    <param name="interpolation"       value="True"/>
+    <rosparam file="$(find minitask5)/param/frontier_mapping_params.yaml" command="load" />
   </node>
-
-  <!-- Navigation -->
-  <!-- <include file="$(find minitask5)/launch/minitask5_navigation.launch"> -->
-      <!-- <arg name="x_nav_pos"   value="-1.3"/> -->
-  <!-- </include> -->
-
-  <!-- Arguments -->
-  <!-- <arg name="x_nav_pos" default="-1.3"/>
-  <arg name="y_nav_pos" default="4.2"/>
-  <arg name="a_nav_theta" default="0.0"/> -->
-
 
   <!-- Turtlebot3 -->
   <include file="$(find turtlebot3_bringup)/launch/turtlebot3_remote.launch">
@@ -78,13 +47,6 @@
   </include>
 
   <!-- move_base -->
-  <include file="$(find minitask5)/launch/move_base.launch">
-    <arg name="model" value="$(arg model)" />
-    <!-- <arg name="move_forward_only" value="$(arg move_forward_only)"/> -->
-  </include>
+  <include file="$(find minitask5)/launch/move_base.launch"/>
 
-  <!-- <group if="$(arg open_rviz)"> 
-    <node pkg="rviz" type="rviz" name="rviz" required="true"
-          args="-d $(find turtlebot3_navigation)/rviz/turtlebot3_navigation.rviz"/>
-  </group> -->
 </launch>
