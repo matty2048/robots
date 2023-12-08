@@ -36,7 +36,8 @@ class frontier_finder():
         self.plot = 0
         self.front_points = []
         pass
-
+    
+    # subscriber for frontier map
     def callback_occ(self, msg: OccupancyGrid):
         self.grid = msg.data
         self.resolution = msg.info.resolution
@@ -48,7 +49,7 @@ class frontier_finder():
         self.find_borders()
         #print(self.front_points)
         
-
+    
     def to_grid(self, px, py, origin_, resolution):
         offsetx = (1/resolution)*(px - origin_[1])
         offsety = (1/resolution)*(py - origin_[0])
@@ -62,6 +63,7 @@ class frontier_finder():
     def to_index(self, gx, gy, size_x):
         return gy * size_x + gx
     
+    # identifies all the boarders between empty known and unknown areas
     def find_borders(self):
         # This turns the map -> binary frontier 
         for j in range(self.height):
@@ -91,6 +93,7 @@ class frontier_finder():
         
         self.pub_frontier.publish(outputmsg)
 
+    # finds and identifies individual components
     def connected_components(self):
         analysis = cv2.connectedComponentsWithStats(self.frontier, 
                                             4, 

@@ -83,7 +83,7 @@ class Camera:
         blueLowerValues = np.array([90, 160, 160])
         blueUpperValues = np.array([128, 255, 255])
         self.blueMask = cv2.inRange(hsv, blueLowerValues, blueUpperValues)
-        cv2.imshow("blue mask", self.blueMask)
+        #cv2.imshow("blue mask", self.blueMask)
 
         greenLowerValues = np.array([40, 200, 20])
         greenUpperValues = np.array([70, 255, 255])
