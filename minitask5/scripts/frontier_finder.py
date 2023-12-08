@@ -50,7 +50,7 @@ class frontier_finder():
         
 
     def to_grid(self, px, py, origin_, resolution):
-        offsetx = (1/resolution)*(px - origin_[1] + self.corr_x)
+        offsetx = (1/resolution)*(px - origin_[1])
         offsety = (1/resolution)*(py - origin_[0])
         return (int(offsetx), int(offsety))
         
@@ -72,14 +72,18 @@ class frontier_finder():
                 # all the neighbours of this node idx 
                 neighbour_idx = [self.to_index(j, i+1, self.width), self.to_index(j, i-1, self.width), self.to_index(j+1,i, self.width), self.to_index(j-1,i, self.width)]
                 status = 0
+                # loop over all the neighbours
                 for neighbour in neighbour_idx:
+                    # if this is an empty cell
                     if (self.grid[idx] == 0):
                         if(neighbour > 0 and neighbour < len(self.grid) and self.grid[neighbour] == -1):
                             # if any neighbours are unknown then the node is a frontier
                             status = 255
                 self.frontier[i][j][0] = status
+        # use connected components to calculate the middle of the frontier points
         self.front_points = self.connected_components()
         outputmsg = [] 
+        # convert frontiers to world space
         for point in self.front_points:
             w_p = self.to_world(point[0], point[1], (self.origin.position.x, self.origin.position.y), self.resolution)
             p = Point(w_p[0], w_p[1], 0)
@@ -92,12 +96,12 @@ class frontier_finder():
                                             4, 
                                             cv2.CV_32S) 
         (totalLabels, label_ids, values, centroid) = analysis
-        return centroid
-
-    def to_world(self, gx, gy, origin, resolution):
-        offsetx = (resolution)*gx + origin[1] - self.corr_x
-        offsety = (resolution)*gy + origin[0]
-        return (offsetx, offsety)
+        outputarray = []
+        # get the centre of bounding box for point to navigate to, centroid doesn't work
+        for i in range(1, totalLabels):
+            centre = (values[i, cv2.CC_STAT_LEFT] + values[i, cv2.CC_STAT_WIDTH]/2,values[i, cv2.CC_STAT_TOP] + values[i, cv2.CC_STAT_HEIGHT]/2)
+            outputarray.append(centre)
+        return outputarray
 
     def run(self):
 

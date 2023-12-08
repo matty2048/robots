@@ -11,6 +11,9 @@ from minitask5.msg import frontiers
 import tf
 import numpy as np
 import math
+from geometry_msgs.msg import PointStamped
+from std_msgs.msg import Header
+
 
 class Position:
     def __init__(self,x,y,theta):
@@ -35,13 +38,14 @@ class move_to:
         # self.turn = 0
         self.reverse = 0
         self.turn = 0
-
+        self.quat = 0
         # Publisher and Subcriber initialisation
         rospy.Subscriber('/frontiers', frontiers, self.callback_frontiers)
         self.vel_pub = rospy.Publisher('cmd_vel', Twist, queue_size=10)
         rospy.Subscriber('scan', LaserScan, self.callback_laser)
         rospy.Subscriber('odom', Odometry, self.callback_odom)
-
+        self.stamp_pub = rospy.Publisher('point', PointStamped, queue_size=10)
+        self.last_goal = 0
         # Create main node
         rospy.init_node('move_to.py', anonymous=False)
 
@@ -76,12 +80,20 @@ class move_to:
         ac = actionlib.SimpleActionClient("move_base", MoveBaseAction)
 
         #wait for the action server to come up
-        while(not ac.wait_for_server(rospy.Duration.from_sec(5.0))):
+        while(not ac.wait_for_server(rospy.Duration.from_sec(5.0)) and not rospy.is_shutdown()):
             rospy.loginfo("Waiting for the move_base action server to come up")
 
 
         goal = MoveBaseGoal()
-
+        if((xGoal, yGoal) == self.last_goal):
+            return
+        self.last_goal = (xGoal, yGoal)
+        stamp = PointStamped(header=Header(stamp=rospy.Time.now(),
+                                              frame_id="global"),
+                                point=Point(xGoal, yGoal, 0.0))
+        
+        self.stamp_pub.publish(stamp)
+        
         #set up the frame parameters
         goal.target_pose.header.frame_id = "map"
         goal.target_pose.header.stamp = rospy.Time.now()
@@ -97,7 +109,7 @@ class move_to:
         rospy.loginfo("Sending goal location ...")
         ac.send_goal(goal)
 
-        ac.wait_for_result(rospy.Duration(15))
+        ac.wait_for_result(rospy.Duration(30))
 
         if(ac.get_state() ==  GoalStatus.SUCCEEDED):
             rospy.loginfo("You have reached the destination")
@@ -108,6 +120,7 @@ class move_to:
             return False
 
     def callback_odom(self, msg):
+        self.quat = msg.pose.pose.orientation
         quarternion = [msg.pose.pose.orientation.x,msg.pose.pose.orientation.y,msg.pose.pose.orientation.z, msg.pose.pose.orientation.w]
         (roll, pitch, yaw) = tf.transformations.euler_from_quaternion(quarternion)
         self.pos.theta = yaw
@@ -116,10 +129,13 @@ class move_to:
 
     def decide_goal(self):
         fronts = self.frontiers
+        #print(fronts)
         if not len(fronts): return None
         distances = [math.dist((self.pos.x, self.pos.y), (i.x, i.y)) for i in fronts]
         goals = sorted(list(zip(distances, fronts)), key= lambda x: x[0])
-        return goals[0][1]
+        goal = goals[0][1]
+        goal.y = goal.y
+        return goal
         # for goal in goals:
         #     if goal[0] < 1: continue
         #     else: return goal[1]
@@ -130,22 +146,23 @@ class move_to:
         r = rospy.Rate(self.SLEEP_RATE)
         # Whilst not shutdown OR Found all objects
         r.sleep()
-
+        t = rospy.Time.now().to_sec()
+        num_secs = 2
+        back = self.ranges[160:200]
+        front = self.ranges[340:360] + self.ranges[0:20]
+        while rospy.Time.now().to_sec() - t < rospy.Duration(num_secs).to_sec() and (min(back) > 0.4 and min(front) < 0.4):
+            vel_msg = Twist()
+            vel_msg.linear.x = -0.04
+            self.vel_pub.publish( vel_msg )
+            r.sleep()
 
         while not rospy.is_shutdown():
-            t = rospy.Time.now().to_sec()
-            # num_secs = 10
-            # back = self.ranges[160:200]
-            # front = self.ranges[340:360] + self.ranges[0:20]
-            # while rospy.Time.now().to_sec() - t < rospy.Duration(num_secs).to_sec() and (min(back) > 0.4 and min(front) < 0.4):
-            #     vel_msg = Twist()
-            #     vel_msg.linear.x = -0.04
-            #     self.vel_pub.publish( vel_msg )
-            #     r.sleep()
-            # goal: Point = self.decide_goal()
-            # if goal == None: continue
-            # if not self.moveToGoal(goal.x - self.corr_x , goal.y):
-            #     print("failed to reach goal")
+            
+            goal: Point = self.decide_goal()
+            if goal == None: continue
+            if not self.moveToGoal(goal.x, goal.y):
+                #goal = np.random.shuffle(self.frontiers)[0]
+                print("failed to reach goal")
 
             # Move to main controller set up 
             # Check for certainty of position with covariance to activate move_base
