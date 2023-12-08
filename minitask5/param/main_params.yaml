@@ -1,0 +1,14 @@
+# Number of objects to find
+max_green_boxes: 2
+max_red_hydrants: 2
+
+# Size of the objects to find
+red_radius: 0.4
+green_radius: 0.5
+
+# Tolerance for the difference between the seen location and intepreted location
+red_tolerance: 1
+green_tolerance: 1
+
+# Max range on detecting objects
+detection_range: 1.5

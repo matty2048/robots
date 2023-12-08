@@ -1,0 +1,23 @@
+# Whether there is a map provided by the GetMap Service 
+map_provided: True
+pub_to: /map
+
+# Any corrections between the map and the world
+corr_x: 0.3
+corr_y: 0
+
+# Size of the map
+size_x: 384
+size_y: 384
+
+# Resolution of the map in m
+res: 0.05
+
+# Size of the buffer around obstacles
+buffer_size: 1
+
+# Whether to use the predefined blue tileset
+blue_tiles_provided: True
+
+# Turning on/off interpolation
+interpolation: True
