@@ -15,8 +15,13 @@ from minitask5.msg import image_proc
 from minitask5.msg import object_data
 import queue
 import tf
+import tf2_ros as tf2
 from struct import * 
 import math
+from geometry_msgs.msg import PointStamped
+from std_msgs.msg import Header
+from geometry_msgs.msg import Point
+import tf2_geometry_msgs as tf2geo
 class Position:
     def __init__(self,x,y,theta):
         self.x : float = x 
@@ -39,6 +44,7 @@ class Camera:
         self.image_sub = rospy.Subscriber('camera/rgb/image_raw', Image, self.image_callback)
         self.depth_sub = rospy.Subscriber('camera/depth/points', PointCloud2, self.depth_callback)
         self.obj_pub = rospy.Publisher('/image_proc', image_proc, queue_size=10)
+        self.stamp_pub = rospy.Publisher('point2', PointStamped, queue_size=10)
         self.image_resized = []
         self.blueMask = []
         self.redMask = []
@@ -50,12 +56,14 @@ class Camera:
         self.depth_ready = False
         self.img_ready = False
         self.pos = Position(0,0,0)
+        self.buffer = tf2.Buffer()
+        self.listener = tf2.TransformListener(self.buffer)
         cv2.startWindowThread()
     
     def image_callback(self, msg):
         self.image = self.bridge.imgmsg_to_cv2(msg,desired_encoding='bgr8')
         (h, w) = self.image.shape[:2]
-        self.image = cv2.resize(self.image, (int(w/4),int(h/4)))
+        self.image = cv2.resize(self.image, (int(w),int(h)))
         hsv = cv2.cvtColor(self.image, cv2.COLOR_BGR2HSV)
         hsl = cv2.cvtColor(self.image, cv2.COLOR_BGR2HLS)
         #h = hsv[:, :, 0]
@@ -63,6 +71,7 @@ class Camera:
         blueUpperValues = np.array([128, 255, 255])
         self.blueMask = cv2.inRange(hsv, blueLowerValues, blueUpperValues)
         cv2.imshow("blue mask", self.blueMask)
+
         greenLowerValues = np.array([40, 200, 20])
         greenUpperValues = np.array([70, 255, 255])
         self.greenMask = cv2.inRange(hsv, greenLowerValues, greenUpperValues)
@@ -86,6 +95,17 @@ class Camera:
     def xytoidx(self, x, y):
         return 1920*y + x
     
+    def transform_between_frames(self, p : Point, from_frame, to_frame):
+     
+        input_pose_stamped = tf2geo.PoseStamped()
+        input_pose_stamped.pose.position = p
+        input_pose_stamped.header.frame_id = from_frame
+        input_pose_stamped.header.stamp = rospy.Time.now()
+ 
+        output_pose_stamped = self.buffer.transform(input_pose_stamped, to_frame, rospy.Duration(1))
+        return output_pose_stamped.pose.position
+
+
     def depth_callback(self, msg):      
         #4147200
         #2073600
@@ -117,66 +137,72 @@ class Camera:
         for i in range(1, totalLabels):
             dat = object_data()
             dat.blue = 255
-            centre = centroid[i]
-            centre_x = int(centre[0] * 4)
-            centre_y = int(centre[1] * 4)
-            centre_bot = pointcloud[self.to_idx(centre_x, centre_y, 1920)][0:2]
+            centre = centroid[1]
+            centre_x = int(centre[0])
+            centre_y = int(centre[1])
+            centre_bot = pointcloud[self.to_idx(centre_x, centre_y, 1920)]
             if math.isnan(centre_bot[0]) or math.isnan(centre_bot[1]): 
                 continue
-            centre_rotated = (centre_bot[0] * math.cos(-self.pos.theta) - centre_bot[1] * math.sin(-self.pos.theta), 
-                              centre_bot[0] * math.sin(-self.pos.theta) + centre_bot[1] * math.cos(-self.pos.theta))
-            centre_world = (centre_rotated[0] + self.pos.x, centre_rotated[1] + self.pos.y)
-            dat.x_location = centre_world[0]
-            dat.y_location = centre_world[1]
-            print(dat.x_location, dat.y_location)
+            p = Point(centre_bot[0],centre_bot[1],centre_bot[2])
+            p = self.transform_between_frames(p, "camera_depth_frame","odom")
+            dat.x_location = p.x
+            dat.y_location = p.y
+            print(p.x,p.y)
+            stamp = PointStamped(header=Header(stamp=rospy.Time.now(),
+                                frame_id="odom"),
+                                point=Point(dat.x_location, dat.y_location, 0.0))
+            self.stamp_pub.publish(stamp)
+            #print(dat.x_location, dat.y_location)
             data.append(dat)
         # self.obj_pub.publish(data)
 
-        # get red obj locations
-        analysis = cv2.connectedComponentsWithStats(redmask, 
-                                            4, 
-                                            cv2.CV_32S)
-        (totalLabels, label_ids, stats, centroid) = analysis
-        # data = []
-        for i in range(1,totalLabels):
-            dat = object_data()
-            dat.red = 255
-            centre = centroid[i]
-            centre_x = int(centre[0] * 4)
-            centre_y = int(centre[1] * 4)
-            centre_bot = pointcloud[self.to_idx(centre_x, centre_y, 1920)][0:2]
-            if math.isnan(centre_bot[0]) or math.isnan(centre_bot[1]): 
-                continue
-            centre_rotated = (centre_bot[0] * math.cos(-self.pos.theta) - centre_bot[1] * math.sin(-self.pos.theta), 
-                              centre_bot[0] * math.sin(-self.pos.theta) + centre_bot[1] * math.cos(-self.pos.theta))
-            centre_world = (centre_rotated[0] + self.pos.x, centre_rotated[1] + self.pos.y)
-            dat.x_location = centre_world[0]
-            dat.y_location = centre_world[1]
-            data.append(dat)
-        # self.obj_pub.publish(data)
+        # # get red obj locations
+        # analysis = cv2.connectedComponentsWithStats(redmask, 
+        #                                     4, 
+        #                                     cv2.CV_32S)
+        # (totalLabels, label_ids, stats, centroid) = analysis
+        # # data = []
+        # for i in range(1,totalLabels):
+        #     dat = object_data()
+        #     dat.red = 255
+        #     centre = centroid[i]
+        #     centre_x = int(centre[0] * 4)
+        #     centre_y = int(centre[1] * 4)
+        #     centre_bot = pointcloud[self.to_idx(centre_x, centre_y, 1920)]
+        #     if math.isnan(centre_bot[0]) or math.isnan(centre_bot[1]): 
+        #         continue
+            
+        #     #centre_rotated = (centre_bot[0] * math.cos(-self.pos.theta) - centre_bot[1] * math.sin(-self.pos.theta), 
+        #                       #centre_bot[0] * math.sin(-self.pos.theta) + centre_bot[1] * math.cos(-self.pos.theta))
+        #     #centre_world = (centre_rotated[0] + self.pos.x, centre_rotated[1] + self.pos.y)
+        #     #dat.x_location = centre_world[0]
+        #     #dat.y_location = centre_world[1]
+            
+        #     data.append(dat)
+        # # self.obj_pub.publish(data)
 
-        #get green obj locations
-        analysis = cv2.connectedComponentsWithStats(greenmask, 
-                                            4, 
-                                            cv2.CV_32S)
-        (totalLabels, label_ids, stats, centroid) = analysis
-        # data = []
-        for i in range(1,totalLabels):
-            dat = object_data()
-            dat.green = 255
-            centre = centroid[i]
-            centre_x = int(centre[0] * 4)
-            centre_y = int(centre[1] * 4)
-            centre_bot = pointcloud[self.to_idx(centre_x, centre_y, 1920)][0:2]
-            if math.isnan(centre_bot[0]) or math.isnan(centre_bot[1]): 
-                continue
-            centre_rotated = (centre_bot[0] * math.cos(-self.pos.theta) - centre_bot[1] * math.sin(-self.pos.theta), 
-                              centre_bot[0] * math.sin(-self.pos.theta) + centre_bot[1] * math.cos(-self.pos.theta))
-            centre_world = (centre_rotated[0] + self.pos.x, centre_rotated[1] + self.pos.y)
-            dat.x_location = centre_world[0]
-            dat.y_location = centre_world[1]
-            data.append(dat)
-        self.obj_pub.publish(data)
+        # #get green obj locations
+        # analysis = cv2.connectedComponentsWithStats(greenmask, 
+        #                                     4, 
+        #                                     cv2.CV_32S)
+        # (totalLabels, label_ids, stats, centroid) = analysis
+        # # data = []
+        # for i in range(1,totalLabels):
+        #     dat = object_data()
+        #     dat.green = 255
+        #     centre = centroid[i]
+        #     centre_x = int(centre[0] * 4)
+        #     centre_y = int(centre[1] * 4)
+        #     centre_bot = pointcloud[self.to_idx(centre_x, centre_y, 1920)][0:2]
+        #     if math.isnan(centre_bot[0]) or math.isnan(centre_bot[1]): 
+        #         continue
+        #     centre_rotated = (centre_bot[0] * math.cos(-self.pos.theta) - centre_bot[1] * math.sin(-self.pos.theta), 
+        #                       centre_bot[0] * math.sin(-self.pos.theta) + centre_bot[1] * math.cos(-self.pos.theta))
+        #     centre_world = (centre_rotated[0] + self.pos.x, centre_rotated[1] + self.pos.y)
+        #     dat.x_location = centre_world[0]
+        #     dat.y_location = centre_world[1]
+        #     data.append(dat)
+        # self.obj_pub.publish(data)
 
         #mask_indices = np.transpose(np.where(self.blueMask != 0))
         #print(mask_indices)

@@ -38,7 +38,7 @@ class frontier_mapping():
         self.size_y = int(current_map.info.height/2)
         self.res = res
         self.grid : list[int] = [-1]*self.size_x*self.size_y
-
+        self.vel = 0
         self.occ_pub = rospy.Publisher('/map_frontier', OccupancyGrid, queue_size=10)
         rospy.Subscriber('scan', LaserScan, self.callback_laser)
         rospy.Subscriber('odom', Odometry, self.callback_odom)

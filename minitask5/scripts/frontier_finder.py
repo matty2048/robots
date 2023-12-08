@@ -50,7 +50,7 @@ class frontier_finder():
         
 
     def to_grid(self, px, py, origin_, resolution):
-        offsetx = (1/resolution)*(px - origin_[1] + self.corr_x)
+        offsetx = (1/resolution)*(px - origin_[1])
         offsety = (1/resolution)*(py - origin_[0])
         return (int(offsetx), int(offsety))
         
@@ -92,10 +92,14 @@ class frontier_finder():
                                             4, 
                                             cv2.CV_32S) 
         (totalLabels, label_ids, values, centroid) = analysis
-        return centroid
+        outputarray = []
+        for i in range(1, totalLabels):
+            centre = (values[i, cv2.CC_STAT_LEFT] + values[i, cv2.CC_STAT_WIDTH]/2,values[i, cv2.CC_STAT_TOP] + values[i, cv2.CC_STAT_HEIGHT]/2)
+            outputarray.append(centre)
+        return outputarray
 
     def to_world(self, gx, gy, origin, resolution):
-        offsetx = (resolution)*gx + origin[1] - self.corr_x
+        offsetx = (resolution)*gx + origin[1]
         offsety = (resolution)*gy + origin[0]
         return (offsetx, offsety)
 
