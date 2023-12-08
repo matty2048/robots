@@ -18,6 +18,11 @@
     <remap from="odom" to="$(arg odom_topic)"/>
     <param name="DWAPlannerROS/min_vel_x" value="0.0" if="$(arg move_forward_only)" />
 
+    <param name ="max_planning_retries" value="1"/>
+    <param name ="oscillation_timeout"  value="5"/>
+    <param name ="recovery_behavior_enabled" value = "true"/>
+    <param name ="max_planning_retries" value = "1"/>
+
     <!-- Custom Parameter settings for Planner -->
     <!-- <param name="DWAPlannerROS/max_vel_x" value="0.2"/>
     <param name="DWAPlannerROS/min_vel_x" value="-0.15" if="$(eval arg('move_forward_only') == false)"/>

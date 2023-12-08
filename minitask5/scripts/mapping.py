@@ -61,7 +61,10 @@ class map_navigation():
         self.buffer = rospy.get_param(node_name + '/buffer_size')
         self.res = rospy.get_param(node_name + '/res')
         self.blue_tiles_provided = rospy.get_param(node_name + '/blue_tiles_provided')
+        self.dynamic = rospy.get_param(node_name + '/dynamic_mapping')
         self.interpolation = rospy.get_param(node_name + '/interpolation')
+        self.past_grid_capacity = rospy.get_param(node_name + '/past_grid_capacity')
+        self.interpretation = rospy.get_param(node_name + '/interpretation')
         self.grid : list[int] = [-1]*self.size_x*self.size_y
         self.origin_ = origin
 
@@ -261,10 +264,25 @@ class map_navigation():
             endpos = self.to_grid(cur_pos[0] + (points[i]) * -math.sin(rads), cur_pos[1] + (points[i]) * math.cos(rads), self.origin_, self.res)
             gridpoints = self.get_line(cur_pos_grid, endpos)
             for i in range(self.buffer):
+                if i == len(gridpoints): break
                 temp = (gridpoints[-1 - i][0], gridpoints[-1 - i][1])
                 self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 100
             # temp = (gridpoints[-1][0], gridpoints[-1][1])
             # self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 100
+
+        # Interpretated obstacles 
+        if self.interpretation:
+            for i in range(len(points)):
+                if points[i] == 0: continue
+                rads = (radians(i) + cur_angle - math.pi/2) 
+                endpos = self.to_grid(cur_pos[0] + (points[i]) * -math.sin(rads) + self.res*self.interpretation,
+                                        cur_pos[1] + (points[i]) * math.cos(rads) + self.res*self.interpretation
+                                        , self.origin_, self.res)
+                gridpoints = self.get_line(cur_pos_grid, endpos)
+                for i in range(self.interpretation):
+                    if i == len(gridpoints): break
+                    temp = (gridpoints[-1 - i][0], gridpoints[-1 - i][1])
+                    self.grid[self.to_index(temp[0], temp[1], self.size_x)] = 100
 
         # If interpolation is required, obstacles are placed between LIDAR readings within a certain distance of each other
         if self.interpolation:
@@ -285,19 +303,21 @@ class map_navigation():
         while not self.grid:
             r.sleep()
         while not rospy.is_shutdown():
-            # Adds old grid points to the past grids
-            self.past_grids.append(self.grid)
-
             # Adds current LIDAR readings
-            self.map_all_lines()
+            if self.dynamic:
+                self.map_all_lines()
 
             # Adds any objects found
             self.renew_objects()
 
             # Publishes a new occupancy grid
             self.pub_occ_grid(self.past_grids)
-            if len(self.past_grids) >= 6:
-                self.past_grids = self.past_grids[1:]
+            if len(self.past_grids) >= self.past_grid_capacity:
+                self.past_grids = self.past_grids[2:]
+            
+            # Adds old grid points to the past grids
+            self.past_grids.append(self.grid)
+
             r.sleep()
 
     

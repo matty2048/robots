@@ -1,5 +1,5 @@
 # Whether there is a map provided by the GetMap Service 
-map_provided: True
+map_provided: False
 pub_to: /map_frontier
 
 # Any corrections between the map and the world
@@ -7,17 +7,26 @@ corr_x: 0.3
 corr_y: 0
 
 # Size of the map
-size_x: 192
-size_y: 192
+size_x: 96
+size_y: 96
 
 # Resolution of the map in m
-res: 0.1
+res: 0.2
 
 # Size of the buffer around obstacles
-buffer_size: 1
+buffer_size: 2
 
 # Whether to use the predefined blue tileset
 blue_tiles_provided: False
 
 # Turning on/off interpolation
 interpolation: True
+
+# Dynamic Mapping
+dynamic_mapping: True
+
+# Number of past grids
+past_grid_capacity: 8
+
+# Number of blocks behind an object
+interpretation: 0

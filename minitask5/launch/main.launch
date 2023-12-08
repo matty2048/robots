@@ -22,6 +22,8 @@
   <node name="move_to" pkg="minitask5" type="move_to.py" output="screen">
     <param name="max_green_boxes"             value="2"/>
     <param name="max_red_hydrants"            value="2"/>
+    <param name="timeout"             value="45"/>
+
   </node>
   <!-- <node name="scan_obj" pkg="minitask5" type="scan_obj.py" output="screen"/> -->
   <node name="mapping" pkg="minitask5" type="mapping.py" output="screen">

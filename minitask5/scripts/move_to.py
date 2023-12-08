@@ -28,11 +28,14 @@ class move_to:
         # Parameter initialisation
         self.param_max_green_boxes = rospy.get_param('/main/max_green_boxes')
         self.param_max_red_hydrants = rospy.get_param('/main/max_red_hydrants')
+        self.param_timeout = rospy.get_param('/move_to/timeout')
         
         # Variable initialisation
         self.pos = Position(0, 0, 0)
         self.frontiers = []
         self.corr_x = 0.3
+        self.potentially_unreachable = []
+        self.current_goal = None
 
         # Turn condition variable initialisation
         # self.turn = 0
@@ -110,7 +113,7 @@ class move_to:
         rospy.loginfo("Sending goal location ...")
         ac.send_goal(goal)
 
-        ac.wait_for_result(rospy.Duration.from_sec(30))
+        ac.wait_for_result(rospy.Duration.from_sec(self.param_timeout))
 
         if(ac.get_state() ==  GoalStatus.SUCCEEDED):
             rospy.loginfo("You have reached the destination")
@@ -129,7 +132,10 @@ class move_to:
         self.pos.y = msg.pose.pose.position.y
 
     def decide_goal(self):
-        fronts = self.frontiers
+        for goal in self.frontiers:
+            if not goal in self.potentially_unreachable:
+                self.goal = goal
+                return goal
         return self.frontiers[0]
         #print(fronts)
         # if not len(fronts): return None
@@ -149,16 +155,18 @@ class move_to:
         # Whilst not shutdown OR Found all objects
         r.sleep()
         t = rospy.Time.now().to_sec()
-        num_secs = 3
+        num_secs = 6
         back = self.ranges[160:200]
         front = self.ranges[340:360] + self.ranges[0:20]
+        front_wide = self.ranges[315:360] + self.ranges[0:45]
+        back_wide = self.ranges[135:180] + self.ranges[180:225]
         while rospy.Time.now().to_sec() - t < rospy.Duration(num_secs).to_sec() and (min(back) > 0.4 and min(front) < 0.4):
             vel_msg = Twist()
             vel_msg.linear.x = -0.04
             self.vel_pub.publish( vel_msg )
             r.sleep()
 
-        num_secs = 10
+        num_secs = 5
         while rospy.Time.now().to_sec() - t < rospy.Duration(num_secs).to_sec():
             self.vel_pub.publish( Twist() )
             r.sleep()
@@ -166,13 +174,15 @@ class move_to:
             
             goal: Point = self.decide_goal()
             if goal == None: continue
-            if not self.moveToGoal(goal.x, goal.y):
-                np.random.shuffle(self.frontiers)
-                continue
-                print("failed to reach goal")
 
-            # Move to main controller set up 
-            # Check for certainty of position with covariance to activate move_base
+            succeeded = self.moveToGoal(goal.x, goal.y)
+            if not succeeded:
+                self.potentially_unreachable.append(self.goal)
+                np.random.shuffle(self.frontiers)
+                print("failed to reach goal")
+            
+            self.vel_pub.publish( Twist() )
+
             r.sleep()
 
 if __name__ == '__main__':

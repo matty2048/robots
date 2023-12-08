@@ -71,16 +71,16 @@ class Main:
     def add_objects_to_list(self):
         for obj in self.objects_found:
             obj: object_data
-            # Checks obj colour
+            # Checks obj colour and if too many objects have been added to list
             # Checks if it has already been added
             # Checks if it's in the map
             # Checks if it's close enough to the robot to be counted
-            if obj.red > 200:
+            if obj.red > 200 and len(self.red_obj) < 3*self.param_max_red_hydrants:
                 if self.check_obj_in_list(obj, self.red_obj, self.red_tolerance): continue
                 if not self.check_obj_in_map(obj, self.grid, int(self.red_radius/self.resolution)): continue
                 if self.check_obj_dist_to_robot(obj, self.pos) > self.obj_detection_range: continue
                 self.red_obj.append(obj)
-            if obj.green > 200:
+            if obj.green > 200 and len(self.green_obj) < 3*self.param_max_green_boxes:
                 if self.check_obj_in_list(obj, self.green_obj, self.green_tolerance): continue
                 if not self.check_obj_in_map(obj, self.grid, int(self.green_radius/self.resolution)): continue
                 if self.check_obj_dist_to_robot(obj, self.pos) > self.obj_detection_range: continue

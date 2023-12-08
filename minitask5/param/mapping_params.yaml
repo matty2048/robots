@@ -20,4 +20,13 @@ buffer_size: 1
 blue_tiles_provided: True
 
 # Turning on/off interpolation
-interpolation: True
+interpolation: False
+
+# Dynamic Mapping
+dynamic_mapping: False
+
+# Number of past grids
+past_grid_capacity: 8
+
+# Number of blocks behind an object
+interpretation: 0
