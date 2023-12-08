@@ -16,8 +16,6 @@ class Position:
         self.y : float = y
         self.theta : float = theta
 
-
-
 class map_navigation():
     ROBOT_WIDTH = 0.2
 
@@ -93,14 +91,14 @@ class map_navigation():
         return new_map.flatten().tolist()
     
     def to_grid(self, px, py, origin_, resolution):
-        offsetx = (1/resolution)*(px - origin_[1] + self.corr_x)
-        offsety = (1/resolution)*(py - origin_[0])
+        offsetx = (1/resolution)*(px - origin_[0] + self.corr_x)
+        offsety = (1/resolution)*(py - origin_[1])
         return (int(offsetx), int(offsety))
         
         
     def to_world(self, gx, gy, origin, resolution):
-        offsetx = (resolution)*gx + origin[1]
-        offsety = (resolution)*gy + origin[0]
+        offsetx = (resolution)*gx + origin[0] - self.corr_x
+        offsety = (resolution)*gy + origin[1]
         return (offsetx, offsety)
 
     def to_index(self, gx, gy, size_x):
@@ -193,8 +191,8 @@ class map_navigation():
         self.old_grid.info.height = self.size_y
         self.old_grid.info.width = self.size_x
         self.old_grid.info.resolution = self.res
-        self.old_grid.info.origin.position.x = self.to_world(0, 0, self.origin_, self.res)[0]
-        self.old_grid.info.origin.position.y = self.to_world(0, 0, self.origin_, self.res)[1]
+        self.old_grid.info.origin.position.x = self.origin_[0]
+        self.old_grid.info.origin.position.y = self.origin_[1]
         publish_grid = [int(sum(x)/len(past_grids)) for x in zip(*past_grids)]
         publish_grid = [x if x >= 0 else -1 for x in publish_grid]
 
